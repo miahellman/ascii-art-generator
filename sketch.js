@@ -37,6 +37,7 @@ function setup() {
 
   //inject button styles into the page
   //doing this in css because inline styles can't handle :hover
+  //the .wide modifier gives the splash upload button a fixed width so it centers cleanly
   let style = createElement('style', `
     button.ascii-btn {
       background: #000;
@@ -48,6 +49,9 @@ function setup() {
       font-size: 14px;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
+    }
+    button.ascii-btn.wide {
+      width: 140px;
     }
     button.ascii-btn:hover {
       background: #fff;
@@ -61,7 +65,8 @@ function setup() {
 
   //create the visible upload button on the splash screen
   uploadButton = createButton('upload image');
-  uploadButton.class('ascii-btn');
+  //wide variant so we have a known width for centering
+  uploadButton.class('ascii-btn wide');
   //when clicked, fire a click on the hidden file input to open the file picker
   uploadButton.mousePressed(() => input.elt.click());
 
@@ -77,20 +82,19 @@ function drawSplash() {
   background(255);
   fill(0);
   textAlign(CENTER, CENTER);
-  //big title
+  //big title centered horizontally
   textSize(24);
   text('mia hellman', width / 2, height / 2 - 50);
-  //small instruction text under the title
+  //small instruction text centered under the title
   textSize(12);
-  text('v just do it', width / 2, height / 2 - 10);
+  text('v just do it', width / 2, height / 2 - 20);
 
-  //show the upload button and center it under the text
+  //show the upload button and center it on the same axis as the text
   uploadButton.show();
-  //measure the button's actual width so we can center it perfectly
-  //fallback to 120 if the dom hasn't measured it yet
-  let bw = uploadButton.elt.offsetWidth || 120;
-  let bh = uploadButton.elt.offsetHeight || 36;
-  uploadButton.position(width / 2 - bw / 2, height / 2 + 10);
+  //button width matches the css (140px), so we can subtract half to align center
+  let bw = 140;
+  //horizontally centered at width / 2, sits just below the instruction text
+  uploadButton.position(width / 2 - bw / 2, height / 2);
 }
 
 //handles the canvas resizing when the window/iframe changes size
@@ -212,6 +216,7 @@ function showButtons() {
 
   //save button goes in the top-left corner of the image
   saveButton = createButton('save image');
+  //plain ascii-btn (no wide modifier) so it sizes naturally to its label
   saveButton.class('ascii-btn');
   saveButton.position(10, 10);
   //save the canvas as a png when clicked
