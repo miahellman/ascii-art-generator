@@ -1,270 +1,215 @@
 //ascii image generator
 //converts uploaded images into ascii art that draws over time
 
-//stores the uploaded image
+//image and ascii data
 let img;
-//array to store all ascii character objects
 let asciiChars = [];
-//tracks which character to draw next
 let drawIndex = 0;
-//size of each ascii character cell in pixels
 let cellSize = 6;
-//track if image is ready to draw
 let imageLoaded = false;
-//hidden file input element
+
+//ui elements
 let input;
-//custom upload button on splash screen
 let uploadButton;
-//button to upload a new file after generation
 let newFileButton;
-//button to save the generated ascii art
 let saveButton;
 
-//countdown state
-//whether the countdown is currently running
+//countdown before showing save/upload buttons
 let countdownActive = false;
-//timestamp when countdown started
 let countdownStart = 0;
-//how long to wait before showing buttons (3 seconds)
 let countdownDuration = 3000;
-//whether save/upload-new buttons are visible
 let buttonsShown = false;
 
-//fixed button width so we can center it perfectly without measuring the dom
+//button size constants
 const BTN_WIDTH = 140;
 const BTN_HEIGHT = 36;
 
 //bounds of the ascii art block within the canvas
-//used to center the art and position save/upload buttons on its corners
 let artX = 0;
 let artY = 0;
 let artW = 0;
 let artH = 0;
 
 function setup() {
-  //make canvas fill the whole window for responsive embedding
+  //canvas fills the window for responsive embedding
   createCanvas(windowWidth, windowHeight);
   background(255);
 
-  //create hidden file input that the custom button will trigger
+  //hidden file input triggered by the custom upload button
   input = createFileInput(handleFile);
   input.hide();
 
-  //create the visible upload button on the splash screen
+  //splash screen upload button
   uploadButton = createButton('upload image');
-  //apply styles directly so we don't rely on external css loading
   styleButton(uploadButton);
-  //when clicked, fire a click on the hidden file input to open the file picker
   uploadButton.mousePressed(() => input.elt.click());
 
   drawSplash();
 }
 
-//applies the black-button-with-white-text style to a p5 button
-//also handles hover by swapping styles on mouseOver / mouseOut
-function styleButton(btn) {
-  //base styles for the resting state
-  btn.style('background', '#000');
-  btn.style('color', '#fff');
-  btn.style('border', '1px solid #000');
-  btn.style('border-radius', '0');
-  btn.style('padding', '8px 16px');
-  btn.style('width', BTN_WIDTH + 'px');
-  btn.style('font-family', 'monospace');
-  btn.style('font-size', '14px');
-  btn.style('cursor', 'pointer');
-  btn.style('box-sizing', 'border-box');
-
-  //hover state: white background, black text
-  btn.mouseOver(() => {
-    btn.style('background', '#fff');
-    btn.style('color', '#000');
-  });
-  //leave state: back to black background, white text
-  btn.mouseOut(() => {
-    btn.style('background', '#000');
-    btn.style('color', '#fff');
-  });
+//builds the inline style string for a button at a given bg/text color
+function btnStyle(bg, fg) {
+  return `
+    background: ${bg} !important;
+    color: ${fg} !important;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    padding: 8px 16px !important;
+    width: ${BTN_WIDTH}px !important;
+    font-family: monospace !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+  `;
 }
 
-//draws the title and upload button centered on the splash screen
-//pulled into its own function so setup, resize, and upload-new can all reuse it
+//applies the button style and hover swap
+function styleButton(btn) {
+  const base = btnStyle('#000', '#fff');
+  const hover = btnStyle('#fff', '#000');
+  //set the full style string at once with !important to beat any editor css
+  btn.elt.setAttribute('style', base);
+  btn.elt.addEventListener('mouseenter', () => btn.elt.setAttribute('style', hover));
+  btn.elt.addEventListener('mouseleave', () => btn.elt.setAttribute('style', base));
+}
+
+//draws splash screen with title and upload button
 function drawSplash() {
   background(255);
   fill(0);
-  //explicitly set text alignment every time so it can't leak from another state
   textAlign(CENTER, CENTER);
 
-  //big title centered horizontally at width / 2
+  //title
   textSize(24);
   text('mia hellman', width / 2, height / 2 - 50);
-
-  //small instruction text centered under the title
+  //instruction
   textSize(12);
   text('^ just do it', width / 2, height / 2 - 20);
 
-  //show the upload button and center it on the same x axis as the text
+  //center upload button on the same axis as the text
   uploadButton.show();
-  //since the button has a fixed width, we subtract half of it to align its center with width / 2
   uploadButton.position(width / 2 - BTN_WIDTH / 2, height / 2);
 }
 
-//handles the canvas resizing when the window/iframe changes size
+//keeps canvas responsive
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
-  //only redraw splash if we're on the start screen, not mid-generation
-  if (!imageLoaded && !buttonsShown) {
-    drawSplash();
-  }
+  if (!imageLoaded && !buttonsShown) drawSplash();
 }
 
-//handles file when upload button is used
+//runs when user picks a file
 function handleFile(file) {
-  //check if uploaded file is an image
   if (file.type === 'image') {
-    //load the image and call processImage when done
     img = loadImage(file.data, processImage);
-    //hide all buttons while processing
     uploadButton.hide();
     if (newFileButton) newFileButton.hide();
     if (saveButton) saveButton.hide();
-    //reset state flags so the countdown starts fresh
     buttonsShown = false;
     countdownActive = false;
   }
 }
 
-//processes the uploaded image into ascii characters
+//converts uploaded image into ascii character data
 function processImage() {
-  //clear any previous data from a prior upload
   asciiChars = [];
   drawIndex = 0;
 
-  //figure out the ascii block size
-  //the art is as wide as the window, height follows the image's aspect ratio
+  //ascii art is as wide as the window, height follows the image's aspect ratio
+  //rounded to multiples of cellSize so the grid is clean
   let imgAspect = img.height / img.width;
   artW = floor(windowWidth / cellSize) * cellSize;
   artH = floor((artW * imgAspect) / cellSize) * cellSize;
 
-  //keep canvas at full window size so we can center the art on it
+  //canvas stays full window size so we can center the art and place buttons above it
   resizeCanvas(windowWidth, windowHeight);
   background(255);
 
-  //compute the top-left corner of the art so it sits in the middle of the canvas
+  //center horizontally, push down vertically to leave room for buttons above
   artX = floor((width - artW) / 2);
-  artY = floor((height - artH) / 2);
+  artY = floor((height - artH) / 2) + BTN_HEIGHT + 20;
 
-  //resize image so each pixel maps to one ascii character cell
+  //resize image so each pixel = one ascii cell
   img.resize(artW / cellSize, artH / cellSize);
 
-  //loop through every pixel in the resized image
+  //build the character array offset into the centered art region
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
-      //get the color at this pixel
       let c = img.get(x, y);
-      //calculate brightness value (0-255)
-      let b = brightness(c);
-      //choose ascii character based on brightness
-      let char = getAsciiChar(b);
-
-      //add character object to array with position offset into the centered art region
       asciiChars.push({
         x: artX + x * cellSize,
         y: artY + y * cellSize,
-        char: char,
-        //original pixel color (not using this tho)
-        color: c
+        char: getAsciiChar(brightness(c))
       });
     }
   }
 
-  //set flag to start drawing in the draw() loop
   imageLoaded = true;
-  //reset text alignment back to top-left for drawing ascii chars
   textAlign(LEFT, TOP);
   textSize(cellSize);
 }
 
 function draw() {
-  //only draw if image has been processed
-  if (imageLoaded) {
-    //draw speed depends on num here
-    //higher number = faster reveal
-    for (let i = 0; i < 200; i++) {
-      //check if there are still characters left to draw
-      if (drawIndex < asciiChars.length) {
-        //get the next character from array
-        let ascii = asciiChars[drawIndex];
-        //use black text on white background
-        fill(0);
-        //draw the character at its position
-        text(ascii.char, ascii.x, ascii.y);
-        //move to next character
-        drawIndex++;
-      }
-    }
+  if (!imageLoaded) return;
 
-    //when all characters are drawn, start the silent countdown once
-    if (drawIndex >= asciiChars.length && !countdownActive && !buttonsShown) {
-      countdownActive = true;
-      countdownStart = millis();
+  //reveal 200 characters per frame
+  for (let i = 0; i < 200; i++) {
+    if (drawIndex < asciiChars.length) {
+      let ascii = asciiChars[drawIndex];
+      fill(0);
+      text(ascii.char, ascii.x, ascii.y);
+      drawIndex++;
     }
+  }
 
-    //countdown runs silently in the background so save/upload buttons don't pop up instantly
-    //nothing gets drawn on canvas during countdown so the saved image stays clean
-    if (countdownActive) {
-      if (millis() - countdownStart >= countdownDuration) {
-        countdownActive = false;
-        showButtons();
-      }
-    }
+  //start silent countdown once everything is drawn
+  if (drawIndex >= asciiChars.length && !countdownActive && !buttonsShown) {
+    countdownActive = true;
+    countdownStart = millis();
+  }
+
+  //show buttons after the countdown completes
+  if (countdownActive && millis() - countdownStart >= countdownDuration) {
+    countdownActive = false;
+    showButtons();
   }
 }
 
-//creates the save and upload-new buttons after countdown ends
+//creates the save and upload-new buttons above the ascii art
 function showButtons() {
   buttonsShown = true;
 
-  //save button goes in the top-left corner of the ascii art
+  //save button above the top-left corner of the art
   saveButton = createButton('save image');
   styleButton(saveButton);
-  saveButton.position(artX, artY);
-  //save the canvas as a png when clicked
-  saveButton.mousePressed(() => {
-    saveCanvas('ascii-art', 'png');
-  });
+  saveButton.position(artX, artY - BTN_HEIGHT - 20);
+  saveButton.mousePressed(() => saveCanvas('ascii-art', 'png'));
 
-  //upload-new button goes in the top-right corner of the ascii art
+  //upload-new button above the top-right corner of the art
   newFileButton = createButton('upload new');
   styleButton(newFileButton);
-  newFileButton.position(artX + artW - BTN_WIDTH, artY);
-
-  //reset everything and go back to the splash screen when clicked
-  newFileButton.mousePressed(() => {
-    imageLoaded = false;
-    asciiChars = [];
-    drawIndex = 0;
-    buttonsShown = false;
-
-    saveButton.hide();
-    newFileButton.hide();
-    //clear the file input so selecting the same file again still works
-    input.elt.value = '';
-
-    //resize canvas back to fill the window and redraw splash
-    resizeCanvas(windowWidth, windowHeight);
-    drawSplash();
-  });
+  newFileButton.position(artX + artW - BTN_WIDTH, artY - BTN_HEIGHT - 20);
+  newFileButton.mousePressed(resetToSplash);
 }
 
-//converts brightness value to appropriate ascii character
+//tears down the current art and returns to splash
+function resetToSplash() {
+  imageLoaded = false;
+  asciiChars = [];
+  drawIndex = 0;
+  buttonsShown = false;
+
+  saveButton.hide();
+  newFileButton.hide();
+  input.elt.value = '';
+
+  resizeCanvas(windowWidth, windowHeight);
+  drawSplash();
+}
+
+//maps brightness (0-255) to an ascii character
 function getAsciiChar(brightness) {
-  //character gradient from lightest (spaces) to darkest (#)
-  //more spaces at start = more empty areas for bright pixels
+  //gradient from lightest (spaces) to darkest (#)
   let chars = "   .,:-=+$#";
-  //map brightness to character index
-  //darker pixels (low brightness) get denser characters
   let index = floor(map(brightness, 0, 255, chars.length - 1, 0));
-  //return the character at calculated index
   return chars[index];
 }
