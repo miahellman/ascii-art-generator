@@ -30,34 +30,21 @@ let countdownDuration = 3000;
 //whether save/upload-new buttons are visible
 let buttonsShown = false;
 
+//fixed button width so we can center it perfectly without measuring the dom
+const BTN_WIDTH = 140;
+const BTN_HEIGHT = 36;
+
+//bounds of the ascii art block within the canvas
+//used to center the art and position save/upload buttons on its corners
+let artX = 0;
+let artY = 0;
+let artW = 0;
+let artH = 0;
+
 function setup() {
   //make canvas fill the whole window for responsive embedding
   createCanvas(windowWidth, windowHeight);
   background(255);
-
-  //inject button styles into the page
-  //doing this in css because inline styles can't handle :hover
-  //the .wide modifier gives the splash upload button a fixed width so it centers cleanly
-  let style = createElement('style', `
-    button.ascii-btn {
-      background: #000;
-      color: #fff;
-      border: 1px solid #000;
-      border-radius: 0;
-      padding: 8px 16px;
-      font-family: monospace;
-      font-size: 14px;
-      cursor: pointer;
-      transition: background 0.15s, color 0.15s;
-    }
-    button.ascii-btn.wide {
-      width: 140px;
-    }
-    button.ascii-btn:hover {
-      background: #fff;
-      color: #000;
-    }
-  `);
 
   //create hidden file input that the custom button will trigger
   input = createFileInput(handleFile);
@@ -65,15 +52,39 @@ function setup() {
 
   //create the visible upload button on the splash screen
   uploadButton = createButton('upload image');
-  //wide variant so we have a known width for centering
-  uploadButton.class('ascii-btn wide');
+  //apply styles directly so we don't rely on external css loading
+  styleButton(uploadButton);
   //when clicked, fire a click on the hidden file input to open the file picker
   uploadButton.mousePressed(() => input.elt.click());
 
-  //center-align text for the splash screen
-  textAlign(CENTER, CENTER);
-  fill(0);
   drawSplash();
+}
+
+//applies the black-button-with-white-text style to a p5 button
+//also handles hover by swapping styles on mouseOver / mouseOut
+function styleButton(btn) {
+  //base styles for the resting state
+  btn.style('background', '#000');
+  btn.style('color', '#fff');
+  btn.style('border', '1px solid #000');
+  btn.style('border-radius', '0');
+  btn.style('padding', '8px 16px');
+  btn.style('width', BTN_WIDTH + 'px');
+  btn.style('font-family', 'monospace');
+  btn.style('font-size', '14px');
+  btn.style('cursor', 'pointer');
+  btn.style('box-sizing', 'border-box');
+
+  //hover state: white background, black text
+  btn.mouseOver(() => {
+    btn.style('background', '#fff');
+    btn.style('color', '#000');
+  });
+  //leave state: back to black background, white text
+  btn.mouseOut(() => {
+    btn.style('background', '#000');
+    btn.style('color', '#fff');
+  });
 }
 
 //draws the title and upload button centered on the splash screen
@@ -81,20 +92,21 @@ function setup() {
 function drawSplash() {
   background(255);
   fill(0);
+  //explicitly set text alignment every time so it can't leak from another state
   textAlign(CENTER, CENTER);
-  //big title centered horizontally
+
+  //big title centered horizontally at width / 2
   textSize(24);
   text('mia hellman', width / 2, height / 2 - 50);
+
   //small instruction text centered under the title
   textSize(12);
-  text('v just do it', width / 2, height / 2 - 20);
+  text('^ just do it', width / 2, height / 2 - 20);
 
-  //show the upload button and center it on the same axis as the text
+  //show the upload button and center it on the same x axis as the text
   uploadButton.show();
-  //button width matches the css (140px), so we can subtract half to align center
-  let bw = 140;
-  //horizontally centered at width / 2, sits just below the instruction text
-  uploadButton.position(width / 2 - bw / 2, height / 2);
+  //since the button has a fixed width, we subtract half of it to align its center with width / 2
+  uploadButton.position(width / 2 - BTN_WIDTH / 2, height / 2);
 }
 
 //handles the canvas resizing when the window/iframe changes size
@@ -128,23 +140,22 @@ function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  //image fills the full width of the window
-  //height is calculated from the image's aspect ratio so nothing gets squished
+  //figure out the ascii block size
+  //the art is as wide as the window, height follows the image's aspect ratio
   let imgAspect = img.height / img.width;
-  let newWidth = windowWidth;
-  let newHeight = newWidth * imgAspect;
+  artW = floor(windowWidth / cellSize) * cellSize;
+  artH = floor((artW * imgAspect) / cellSize) * cellSize;
 
-  //round dimensions to nearest multiple of cellSize
-  //this makes sure the character grid lines up cleanly
-  newWidth = floor(newWidth / cellSize) * cellSize;
-  newHeight = floor(newHeight / cellSize) * cellSize;
-
-  //resize canvas to match image proportions
-  resizeCanvas(newWidth, newHeight);
+  //keep canvas at full window size so we can center the art on it
+  resizeCanvas(windowWidth, windowHeight);
   background(255);
 
+  //compute the top-left corner of the art so it sits in the middle of the canvas
+  artX = floor((width - artW) / 2);
+  artY = floor((height - artH) / 2);
+
   //resize image so each pixel maps to one ascii character cell
-  img.resize(width / cellSize, height / cellSize);
+  img.resize(artW / cellSize, artH / cellSize);
 
   //loop through every pixel in the resized image
   for (let y = 0; y < img.height; y++) {
@@ -156,10 +167,10 @@ function processImage() {
       //choose ascii character based on brightness
       let char = getAsciiChar(b);
 
-      //add character object to array with position and properties
+      //add character object to array with position offset into the centered art region
       asciiChars.push({
-        x: x * cellSize,
-        y: y * cellSize,
+        x: artX + x * cellSize,
+        y: artY + y * cellSize,
         char: char,
         //original pixel color (not using this tho)
         color: c
@@ -214,24 +225,19 @@ function draw() {
 function showButtons() {
   buttonsShown = true;
 
-  //save button goes in the top-left corner of the image
+  //save button goes in the top-left corner of the ascii art
   saveButton = createButton('save image');
-  //plain ascii-btn (no wide modifier) so it sizes naturally to its label
-  saveButton.class('ascii-btn');
-  saveButton.position(10, 10);
+  styleButton(saveButton);
+  saveButton.position(artX, artY);
   //save the canvas as a png when clicked
   saveButton.mousePressed(() => {
     saveCanvas('ascii-art', 'png');
   });
 
-  //upload-new button goes in the top-right corner of the image
+  //upload-new button goes in the top-right corner of the ascii art
   newFileButton = createButton('upload new');
-  newFileButton.class('ascii-btn');
-  //wait a tick so the button is in the dom and we can measure its width
-  setTimeout(() => {
-    let bw = newFileButton.elt.offsetWidth || 120;
-    newFileButton.position(width - bw - 10, 10);
-  }, 0);
+  styleButton(newFileButton);
+  newFileButton.position(artX + artW - BTN_WIDTH, artY);
 
   //reset everything and go back to the splash screen when clicked
   newFileButton.mousePressed(() => {
