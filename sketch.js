@@ -1,5 +1,5 @@
-//ASCII image generator
-//converts uploaded images into ASCII art that draws over time
+// ASCII image generator
+// converts uploaded images into ASCII art that draws over time
 let img;
 let asciiChars = [];
 let drawIndex = 0;
@@ -16,23 +16,39 @@ let countdownDuration = 3000; // 3 seconds
 let buttonsShown = false;
 
 function setup() {
-  createCanvas(500, 400);
+  createCanvas(windowWidth, windowHeight);
   background(255);
 
   input = createFileInput(handleFile);
   input.hide();
 
   uploadButton = createButton('upload image');
-  uploadButton.position(width / 2 - 125, height / 2);
   uploadButton.mousePressed(() => input.elt.click());
 
   textAlign(LEFT, TOP);
-  textSize(cellSize);
   fill(0);
+  drawSplash();
+}
+
+// draws the title + upload button centered for the current canvas size
+function drawSplash() {
+  background(255);
+  fill(0);
+  textAlign(LEFT, TOP);
   textSize(24);
   text('mia hellman', width / 2 - 125, height / 2 - 50);
   textSize(12);
   text('^ just do it', width / 2 - 125, height / 2 + 30);
+  uploadButton.position(width / 2 - 50, height / 2);
+  uploadButton.show();
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  // only redraw splash if we're on the start screen
+  if (!imageLoaded && !buttonsShown) {
+    drawSplash();
+  }
 }
 
 function handleFile(file) {
@@ -49,14 +65,33 @@ function handleFile(file) {
 function processImage() {
   asciiChars = [];
   drawIndex = 0;
-  let aspectRatio = img.height / img.width;
-  let newWidth = 400;
-  let newHeight = newWidth * aspectRatio;
+
+  // fit image inside the current window while preserving aspect ratio
+  let maxW = windowWidth;
+  let maxH = windowHeight;
+  let imgAspect = img.width / img.height;
+  let windowAspect = maxW / maxH;
+
+  let newWidth, newHeight;
+  if (imgAspect > windowAspect) {
+    // image is wider than window — constrain by width
+    newWidth = maxW;
+    newHeight = maxW / imgAspect;
+  } else {
+    // image is taller — constrain by height
+    newHeight = maxH;
+    newWidth = maxH * imgAspect;
+  }
+
+  // round to multiples of cellSize so the grid lines up
   newWidth = floor(newWidth / cellSize) * cellSize;
   newHeight = floor(newHeight / cellSize) * cellSize;
+
   resizeCanvas(newWidth, newHeight);
   background(255);
+
   img.resize(width / cellSize, height / cellSize);
+
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       let c = img.get(x, y);
@@ -70,6 +105,7 @@ function processImage() {
       });
     }
   }
+
   imageLoaded = true;
   textSize(cellSize);
 }
@@ -105,7 +141,7 @@ function showButtons() {
     saveCanvas('ascii-art', 'png');
   });
   newFileButton = createButton('upload new');
-  newFileButton.position(300, height - 40);
+  newFileButton.position(width - 110, height - 40);
   newFileButton.mousePressed(() => {
     imageLoaded = false;
     asciiChars = [];
@@ -114,18 +150,10 @@ function showButtons() {
 
     saveButton.hide();
     newFileButton.hide();
-
     input.elt.value = '';
 
-    resizeCanvas(500, 400);
-    background(255);
-    fill(0);
-    textAlign(LEFT, TOP);
-    textSize(24);
-    text('ascii art generator', width / 2 - 125, height / 2 - 50);
-
-    uploadButton.show();
-    uploadButton.position(width / 2 - 125, height / 2);
+    resizeCanvas(windowWidth, windowHeight);
+    drawSplash();
   });
 }
 
