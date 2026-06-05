@@ -31,7 +31,7 @@ let contrast = 1.4;
 let inverted = false;
 
 // Demo image config
-const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
+const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg', 'm.png', 'i.png', 'a.png'];
 //const DEMO_FILES = ['m.png', 'i.png', 'a.png'];
 
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
