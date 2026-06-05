@@ -82,7 +82,7 @@ function pickSplashMessage() {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   background(255);
-  textFont('Noto Sans Mono');
+  textFont('JetBrains Mono');
 
   //inject slider + dropdown styles
   let styleTag = document.createElement('style');
@@ -122,7 +122,7 @@ function setup() {
       border: 2px solid #fff;
       border-radius: 0;
       padding: 6px 8px;
-      font-family: Noto Sans Mono;
+      font-family: JetBrains Mono;
       font-size: 12px;
       cursor: pointer;
       outline: none;
@@ -156,7 +156,7 @@ function styleButton(btn) {
     'border-radius': '0',
     'padding': '8px 16px',
     'width': BTN_W + 'px',
-    'font-family': 'Noto Sans Mono',
+    'font-family': 'JetBrains Mono',
     'font-size': '14px',
     'cursor': 'pointer',
     'box-sizing': 'border-box',
@@ -176,7 +176,7 @@ function styleButton(btn) {
 function drawSplash() {
   background(255);
   fill(0);
-  textFont('Noto Sans Mono');
+  textFont('JetBrains Mono');
   textAlign(CENTER, CENTER);
 
   let title = hasGeneratedOnce ? 'ascii art generator' : 'mia hellman';
@@ -271,7 +271,7 @@ function processImage() {
   hasGeneratedOnce = true;
   textAlign(LEFT, TOP);
   //monospace for ascii so columns align and unicode block/dot chars render properly
-  textFont('Noto Sans Mono');
+  textFont('JetBrains Mono');
   textSize(cellSize);
 
   if (controlsDiv) positionControls();
@@ -313,7 +313,7 @@ function buildControls() {
   controlsDiv.style('background', '#000');
   controlsDiv.style('color', '#fff');
   controlsDiv.style('padding', '16px');
-  controlsDiv.style('font-family', 'Noto Sans Mono');
+  controlsDiv.style('font-family', 'JetBrains Mono');
   controlsDiv.style('font-size', '12px');
   controlsDiv.style('width', PANEL_W - 32 + 'px');
   controlsDiv.style('border', '2px solid #000');
@@ -335,11 +335,10 @@ function buildControls() {
     cellSize = v;
     scheduleRegen();
   });
-  contrastSlider = addSlider('contrast', 0.5, 2.5, contrast, 0.1, v => {
+  contrastSlider = addSlider('contrast', 0.5, 4, contrast, 0.1, v => {
     contrast = v;
     scheduleRegen();
   });
-  //style picker — built with direct DOM for reliability
   addDropdown('style', Object.keys(RAMPS), rampStyle, v => {
     rampStyle = v;
     scheduleRegen();
