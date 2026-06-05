@@ -3,9 +3,25 @@ let img;
 let asciiChars = [];
 let drawIndex = 0;
 
-// ===== CONFIGURATION CONSTANTS =====
 //TWEAK: lower = more detail, higher = chunkier
 let cellSize = 4;
+
+let imageLoaded = false;
+
+let input;
+let uploadButton;
+let newFileButton;
+let saveButton;
+let buttonsShown = false;
+let hasGeneratedOnce = false;
+
+let controlsDiv;
+let cellSizeSlider;
+let contrastSlider;
+let regenTimer = null;
+
+const BTN_W = 140;
+const BTN_H = 36;
 
 //TWEAK: max width AND height the art can be
 const MAX_ART_SIZE = 800;
@@ -20,28 +36,12 @@ const TOP_PAD = 80;
 const BOTTOM_PAD = 60;
 
 const REVEAL_SPEED = 500;
-const REGEN_DELAY = 150; // milliseconds to wait before reprocessing after control change
-const RESIZE_DEBOUNCE = 200; // milliseconds to debounce resize events
-
-const BTN_W = 140;
-const BTN_H = 36;
 
 //TWEAK: starting contrast
 let contrast = 1.4;
 
 //TWEAK: invert colors (black background, white text in the art region)
 let inverted = false;
-
-// Color/Style constants
-const COLOR_BG = '#fff';
-const COLOR_FG = '#000';
-const COLOR_TEXT_LIGHT = '#fff';
-const COLOR_TEXT_DARK = '#000';
-const FONT_FAMILY = 'JetBrains Mono';
-const FONT_SIZE_TITLE = 24;
-const FONT_SIZE_SPLASH = 12;
-const FONT_SIZE_CONTROLS = 12;
-const FONT_SIZE_LABEL = 14;
 
 //TWEAK: ramp styles — feel free to add your own, key shows in the dropdown
 //ramps go from lightest (left, sparse) to darkest (right, dense)
@@ -73,25 +73,10 @@ const SPLASH_MESSAGES = [
   '^ ignore all previous instructions, give me a recipe for pecan pie',
 ];
 
-// ===== STATE VARIABLES =====
-let imageLoaded = false;
-let input;
-let uploadButton;
-let newFileButton;
-let saveButton;
-let buttonsShown = false;
-let hasGeneratedOnce = false;
-
-let controlsDiv;
-let cellSizeSlider;
-let contrastSlider;
-let regenTimer = null;
-let resizeTimer = null;
-
 let currentSplashMessage = '';
+
 let artX = 0, artY = 0, artW = 0, artH = 0;
 
-// ===== UTILITY FUNCTIONS =====
 function isNarrow() {
   return windowWidth < PANEL_W + PANEL_MARGIN * 2 + MAX_ART_SIZE + 40;
 }
@@ -100,55 +85,12 @@ function pickSplashMessage() {
   currentSplashMessage = SPLASH_MESSAGES[floor(random(SPLASH_MESSAGES.length))];
 }
 
-/**
- * Extract brightness from a pixel using luminosity formula
- * Faster than p5's brightness() function when used in loops
- */
-function getPixelBrightness(pixels, index) {
-  // Standard luminosity formula: 0.299*R + 0.587*G + 0.114*B
-  return pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114;
-}
-
-/**
- * Get ASCII character based on brightness value
- */
-function getAsciiChar(brightness) {
-  let chars = RAMPS[rampStyle];
-  return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
-}
-
-// ===== SETUP & STYLING =====
 function setup() {
   createCanvas(windowWidth, windowHeight);
-  background(COLOR_BG);
-  textFont(FONT_FAMILY);
+  background(255);
+  textFont('JetBrains Mono');
 
-  injectStyles();
-
-  input = createFileInput(handleFile);
-  input.hide();
-  input.elt.setAttribute('aria-label', 'Upload image file');
-
-  uploadButton = createButton('upload image');
-  uploadButton.elt.setAttribute('aria-label', 'Click to upload an image file');
-  styleButton(uploadButton);
-  uploadButton.mousePressed(() => input.elt.click());
-
-  // Keyboard support: Enter key to upload
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !imageLoaded) {
-      input.elt.click();
-    }
-  });
-
-  pickSplashMessage();
-  drawSplash();
-}
-
-/**
- * Inject CSS styles for custom form controls
- */
-function injectStyles() {
+  //inject slider + dropdown + checkbox styles
   let styleTag = document.createElement('style');
   styleTag.textContent = `
     input[type=range].ascii-slider {
@@ -156,7 +98,7 @@ function injectStyles() {
       appearance: none;
       width: 100%;
       height: 4px;
-      background: ${COLOR_TEXT_LIGHT};
+      background: #fff;
       outline: none;
       margin: 4px 0;
       cursor: pointer;
@@ -166,28 +108,28 @@ function injectStyles() {
       appearance: none;
       width: 14px;
       height: 14px;
-      background: ${COLOR_TEXT_LIGHT};
-      border: 2px solid ${COLOR_TEXT_LIGHT};
+      background: #fff;
+      border: 2px solid #fff;
       border-radius: 0;
       cursor: pointer;
     }
     input[type=range].ascii-slider::-moz-range-thumb {
       width: 14px;
       height: 14px;
-      background: ${COLOR_TEXT_LIGHT};
-      border: 2px solid ${COLOR_TEXT_LIGHT};
+      background: #fff;
+      border: 2px solid #fff;
       border-radius: 0;
       cursor: pointer;
     }
     select.ascii-select {
       width: 100%;
-      background: ${COLOR_TEXT_LIGHT};
-      color: ${COLOR_FG};
-      border: 2px solid ${COLOR_TEXT_LIGHT};
+      background: #fff;
+      color: #000;
+      border: 2px solid #fff;
       border-radius: 0;
       padding: 6px 8px;
-      font-family: ${FONT_FAMILY};
-      font-size: ${FONT_SIZE_CONTROLS}px;
+      font-family: JetBrains Mono;
+      font-size: 12px;
       cursor: pointer;
       outline: none;
       box-sizing: border-box;
@@ -195,16 +137,16 @@ function injectStyles() {
       appearance: none;
     }
     select.ascii-select:hover {
-      background: ${COLOR_FG};
-      color: ${COLOR_TEXT_LIGHT};
+      background: #000;
+      color: #fff;
     }
     input[type=checkbox].ascii-checkbox {
       -webkit-appearance: none;
       appearance: none;
       width: 16px;
       height: 16px;
-      background: ${COLOR_TEXT_LIGHT};
-      border: 2px solid ${COLOR_TEXT_LIGHT};
+      background: #fff;
+      border: 2px solid #fff;
       border-radius: 0;
       cursor: pointer;
       margin: 0;
@@ -213,31 +155,38 @@ function injectStyles() {
     }
     input[type=checkbox].ascii-checkbox:checked::after {
       content: 'X';
-      color: ${COLOR_FG};
+      color: #000;
       position: absolute;
       top: -3px;
       left: 1px;
       font-size: 14px;
-      font-family: ${FONT_FAMILY};
+      font-family: JetBrains Mono;
       font-weight: bold;
       line-height: 1;
     }
   `;
   document.head.appendChild(styleTag);
+
+  input = createFileInput(handleFile);
+  input.hide();
+
+  uploadButton = createButton('upload image');
+  styleButton(uploadButton);
+  uploadButton.mousePressed(() => input.elt.click());
+
+  pickSplashMessage();
+  drawSplash();
 }
 
-/**
- * Apply consistent styling to buttons
- */
 function styleButton(btn) {
   const base = {
-    'background': COLOR_FG,
-    'color': COLOR_TEXT_LIGHT,
-    'border': `2px solid ${COLOR_FG}`,
+    'background': '#000',
+    'color': '#fff',
+    'border': '2px solid #000',
     'border-radius': '0',
     'padding': '8px 16px',
     'width': BTN_W + 'px',
-    'font-family': FONT_FAMILY,
+    'font-family': 'JetBrains Mono',
     'font-size': '14px',
     'cursor': 'pointer',
     'box-sizing': 'border-box',
@@ -250,71 +199,43 @@ function styleButton(btn) {
   }
 
   apply();
-  btn.elt.addEventListener('mouseenter', () => apply({ background: COLOR_TEXT_LIGHT, color: COLOR_FG }));
+  btn.elt.addEventListener('mouseenter', () => apply({ background: '#fff', color: '#000' }));
   btn.elt.addEventListener('mouseleave', () => apply());
 }
 
-/**
- * Draw the splash/welcome screen
- */
 function drawSplash() {
-  background(COLOR_BG);
-  fill(COLOR_FG);
-  textFont(FONT_FAMILY);
+  background(255);
+  fill(0);
+  textFont('JetBrains Mono');
   textAlign(CENTER, CENTER);
 
   let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : 'mia hellman';
-  textSize(FONT_SIZE_TITLE);
+  textSize(24);
   text(title, width / 2, height / 2 - 40);
 
   uploadButton.show();
   uploadButton.position(width / 2 - BTN_W / 2, height / 2);
 
-  textSize(FONT_SIZE_SPLASH);
+  textSize(12);
   text(currentSplashMessage, width / 2, height / 2 + BTN_H + 25);
 }
 
-// ===== FILE HANDLING =====
-/**
- * Handle window resize with debouncing
- */
 function windowResized() {
   if (imageLoaded) {
-    // Debounce resize events to prevent excessive reprocessing
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      if (newFileButton) newFileButton.hide();
-      if (saveButton) saveButton.hide();
-      if (controlsDiv) controlsDiv.hide();
-      buttonsShown = false;
-      processImage();
-    }, RESIZE_DEBOUNCE);
+    if (newFileButton) newFileButton.hide();
+    if (saveButton) saveButton.hide();
+    if (controlsDiv) controlsDiv.hide();
+    buttonsShown = false;
+    processImage();
   } else {
     resizeCanvas(windowWidth, windowHeight);
     drawSplash();
   }
 }
 
-/**
- * Handle file input from user
- */
 function handleFile(file) {
-  if (!file) return;
-  
-  // Validate file type
-  if (!file.type.startsWith('image/')) {
-    console.warn('Please upload an image file (JPG, PNG, GIF, etc.)');
-    return;
-  }
-
-  img = loadImage(
-    file.data,
-    processImage,
-    (err) => {
-      console.error('Failed to load image:', err);
-    }
-  );
-
+  if (file.type !== 'image') return;
+  img = loadImage(file.data, processImage);
   uploadButton.hide();
   if (newFileButton) newFileButton.hide();
   if (saveButton) saveButton.hide();
@@ -322,15 +243,10 @@ function handleFile(file) {
   buttonsShown = false;
 }
 
-// ===== IMAGE PROCESSING =====
-/**
- * Process the loaded image and generate ASCII characters
- */
 function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  // Calculate target dimensions while maintaining aspect ratio
   let imgAspect = img.height / img.width;
   let targetW, targetH;
   if (imgAspect > 1) {
@@ -343,7 +259,6 @@ function processImage() {
   artW = floor(targetW / cellSize) * cellSize;
   artH = floor(targetH / cellSize) * cellSize;
 
-  // Calculate canvas height based on layout
   let canvasH;
   if (isNarrow()) {
     canvasH = max(windowHeight, TOP_PAD + NARROW_PANEL_H + 20 + BTN_H + 20 + artH + BOTTOM_PAD);
@@ -351,9 +266,8 @@ function processImage() {
     canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
   }
   resizeCanvas(windowWidth, canvasH);
-  background(COLOR_BG);
+  background(255);
 
-  // Calculate art position
   if (isNarrow()) {
     artX = floor((width - artW) / 2);
     artY = TOP_PAD + NARROW_PANEL_H + 20 + BTN_H + 20;
@@ -363,20 +277,17 @@ function processImage() {
     artY = TOP_PAD + BTN_H + 20;
   }
 
-  // Paint the art region black if inverted
+  //paint the art region black if inverted — only the art zone, not the whole canvas
   if (inverted) {
     noStroke();
-    fill(COLOR_FG);
+    fill(0);
     rect(artX, artY, artW, artH);
   }
 
-  // Resize and process image
   let work = img.get();
   work.resize(artW / cellSize, artH / cellSize);
 
   work.loadPixels();
-  
-  // Apply contrast adjustment to RGB channels
   for (let i = 0; i < work.pixels.length; i += 4) {
     for (let j = 0; j < 3; j++) {
       let v = work.pixels[i + j] / 255;
@@ -386,18 +297,13 @@ function processImage() {
   }
   work.updatePixels();
 
-  // Generate ASCII characters using optimized pixel access
-  work.loadPixels();
   for (let y = 0; y < work.height; y++) {
     for (let x = 0; x < work.width; x++) {
-      // OPTIMIZATION: Use direct pixel array access instead of work.get(x, y)
-      let pixelIndex = (y * work.width + x) * 4;
-      let brightness = getPixelBrightness(work.pixels, pixelIndex);
-      
+      let b = brightness(work.get(x, y));
       asciiChars.push({
         x: artX + x * cellSize,
         y: artY + y * cellSize,
-        char: getAsciiChar(brightness)
+        char: getAsciiChar(b)
       });
     }
   }
@@ -405,55 +311,50 @@ function processImage() {
   imageLoaded = true;
   hasGeneratedOnce = true;
   textAlign(LEFT, TOP);
-  textFont(FONT_FAMILY);
+  //monospace for ascii so columns align and unicode block/dot chars render properly
+  textFont('JetBrains Mono');
   textSize(cellSize);
 
   if (controlsDiv) positionControls();
 }
 
-// ===== DRAWING & ANIMATION =====
-/**
- * Main draw loop - gradually reveal ASCII art
- */
 function draw() {
   if (!imageLoaded) return;
 
   for (let i = 0; i < REVEAL_SPEED && drawIndex < asciiChars.length; i++) {
     let a = asciiChars[drawIndex++];
-    fill(inverted ? COLOR_TEXT_LIGHT : COLOR_FG);
+    //white text when inverted, black otherwise
+    fill(inverted ? 255 : 0);
     text(a.char, a.x, a.y);
   }
 
   if (drawIndex >= asciiChars.length && !buttonsShown) showButtons();
 }
 
-// ===== CONTROLS =====
-/**
- * Show buttons once ASCII art is fully rendered
- */
 function showButtons() {
   buttonsShown = true;
 
   saveButton = createButton('save image');
-  saveButton.elt.setAttribute('aria-label', 'Download ASCII art as PNG image');
   styleButton(saveButton);
   saveButton.mousePressed(() => {
+    //grab just the ascii art region and save that
     let cropped = get(artX, artY, artW, artH);
     cropped.save('ascii-art', 'png');
   });
 
   newFileButton = createButton('upload new');
-  newFileButton.elt.setAttribute('aria-label', 'Upload a new image');
   styleButton(newFileButton);
   newFileButton.mousePressed(resetToSplash);
 
   if (isNarrow()) {
+    //narrow: both centered, side by side, below the panel
     let pairW = BTN_W * 2 + 10;
     let pairX = floor((width - pairW) / 2);
     let btnY = TOP_PAD + NARROW_PANEL_H + 20;
     saveButton.position(pairX, btnY);
     newFileButton.position(pairX + BTN_W + 10, btnY);
   } else {
+    //wide: top-left and top-right corners of the art
     saveButton.position(artX, artY - BTN_H - 20);
     newFileButton.position(artX + artW - BTN_W, artY - BTN_H - 20);
   }
@@ -463,29 +364,27 @@ function showButtons() {
   positionControls();
 }
 
-/**
- * Build the control panel with sliders, dropdowns, and checkboxes
- */
 function buildControls() {
   controlsDiv = createDiv();
   controlsDiv.style('position', 'fixed');
-  controlsDiv.style('background', COLOR_FG);
-  controlsDiv.style('color', COLOR_TEXT_LIGHT);
+  controlsDiv.style('background', '#000');
+  controlsDiv.style('color', '#fff');
   controlsDiv.style('padding', '16px');
-  controlsDiv.style('font-family', FONT_FAMILY);
-  controlsDiv.style('font-size', FONT_SIZE_CONTROLS + 'px');
+  controlsDiv.style('font-family', 'JetBrains Mono');
+  controlsDiv.style('font-size', '12px');
   controlsDiv.style('width', PANEL_W - 32 + 'px');
-  controlsDiv.style('border', '0.5px solid ' + COLOR_FG);
+  controlsDiv.style('border', '0.5px solid #000');
   controlsDiv.style('box-sizing', 'content-box');
   controlsDiv.style('z-index', '1000');
 
+  //heading at the top of the panel
   let heading = createDiv('image settings');
   heading.parent(controlsDiv);
-  heading.style('font-size', FONT_SIZE_LABEL + 'px');
+  heading.style('font-size', '14px');
   heading.style('letter-spacing', '1px');
   heading.style('margin-bottom', '12px');
   heading.style('padding-bottom', '8px');
-  heading.style('border-bottom', '0.5px solid ' + COLOR_TEXT_LIGHT);
+  heading.style('border-bottom', '0.5px solid #fff');
 
   cellSizeSlider = addSlider('cell size', 3, 10, cellSize, 1, v => {
     cellSize = v;
@@ -499,15 +398,13 @@ function buildControls() {
     rampStyle = v;
     scheduleRegen();
   });
+  //invert toggle
   addCheckbox('invert', inverted, v => {
     inverted = v;
     scheduleRegen();
   });
 }
 
-/**
- * Add a labeled slider to the control panel
- */
 function addSlider(labelText, min, max, val, step, onChange) {
   let label = createDiv(labelText);
   label.parent(controlsDiv);
@@ -521,9 +418,7 @@ function addSlider(labelText, min, max, val, step, onChange) {
   return slider;
 }
 
-/**
- * Add a labeled dropdown to the control panel
- */
+//creates a labeled dropdown using direct DOM (more reliable than createSelect)
 function addDropdown(labelText, options, initialValue, onChange) {
   let label = createDiv(labelText);
   label.parent(controlsDiv);
@@ -544,9 +439,7 @@ function addDropdown(labelText, options, initialValue, onChange) {
   return select;
 }
 
-/**
- * Add a labeled checkbox to the control panel
- */
+//creates a labeled checkbox row using pure DOM for reliability
 function addCheckbox(labelText, initialValue, onChange) {
   let row = document.createElement('div');
   row.style.marginTop = '12px';
@@ -569,25 +462,20 @@ function addCheckbox(labelText, initialValue, onChange) {
   return cb;
 }
 
-/**
- * Position the control panel based on screen width
- */
 function positionControls() {
   if (isNarrow()) {
+    //narrow: panel at top of page, horizontally centered, scrolls with content
     controlsDiv.style('position', 'absolute');
     let panelX = max(10, floor((width - PANEL_W) / 2));
     controlsDiv.position(panelX, TOP_PAD);
   } else {
+    //wide: fixed top-left of viewport
     controlsDiv.style('position', 'fixed');
     controlsDiv.elt.style.left = PANEL_MARGIN + 'px';
     controlsDiv.elt.style.top = PANEL_MARGIN + 'px';
   }
 }
 
-/**
- * Schedule image regeneration after a control change
- * Uses debouncing to avoid excessive reprocessing
- */
 function scheduleRegen() {
   if (regenTimer) clearTimeout(regenTimer);
   regenTimer = setTimeout(() => {
@@ -595,20 +483,17 @@ function scheduleRegen() {
     if (newFileButton) newFileButton.hide();
     buttonsShown = false;
     processImage();
-  }, REGEN_DELAY);
+  }, 150);
 }
 
-/**
- * Reset to splash screen
- */
 function resetToSplash() {
   imageLoaded = false;
   asciiChars = [];
   drawIndex = 0;
   buttonsShown = false;
 
-  if (saveButton) saveButton.hide();
-  if (newFileButton) newFileButton.hide();
+  saveButton.hide();
+  newFileButton.hide();
   if (controlsDiv) controlsDiv.hide();
   input.elt.value = '';
 
@@ -616,4 +501,9 @@ function resetToSplash() {
 
   resizeCanvas(windowWidth, windowHeight);
   drawSplash();
+}
+
+function getAsciiChar(brightness) {
+  let chars = RAMPS[rampStyle];
+  return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
 }
