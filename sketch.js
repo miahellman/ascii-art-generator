@@ -335,7 +335,7 @@ function setup() {
   input.hide();
   input.elt.setAttribute('aria-label', 'Upload image file');
 
-  uploadButton = createButton('upload image');
+  uploadButton = createButton('get creative');
   uploadButton.elt.setAttribute('aria-label', 'Click to upload an image file');
   styleButton(uploadButton);
   uploadButton.mousePressed(() => input.elt.click());
