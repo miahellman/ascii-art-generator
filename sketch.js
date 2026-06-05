@@ -34,7 +34,7 @@ let inverted = false;
 const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 10;
-//TWEAK: how big each floating demo is (in pixels along the longer side)
+//TWEAK: how big each floating demo is
 const DEMO_TARGET_SIZE = 200;
 //TWEAK: cell size for the demos
 const DEMO_CELL_SIZE = 3;
@@ -46,8 +46,11 @@ const DEMO_HOVER_PAD = 20;
 const DEMO_DISPERSE_DIST = 150;
 //TWEAK: smoothing factor — higher = snappier animation
 const DEMO_LERP = 0.08;
-//TWEAK: when no char is more than this many pixels from home, swap back to buffer rendering
+//TWEAK: settle threshold for swapping back to buffer rendering
 const DEMO_SETTLE_THRESHOLD = 1;
+//TWEAK: collision radius as a fraction of demo size — lower = more overlap before bouncing
+//1.0 = touch at edges, 0.7 = overlap by ~30%, 0.5 = overlap by ~50%
+const COLLISION_RADIUS_SCALE = 0.75;
 
 const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
@@ -107,6 +110,7 @@ let artX = 0, artY = 0, artW = 0, artH = 0;
 
 let demoRawImages = [];
 let demoImages = [];
+let glyphCache = {};
 
 // ===== PRELOAD =====
 function preload() {
@@ -135,6 +139,32 @@ function getPixelBrightness(pixels, index) {
 function getAsciiChar(brightness) {
   let chars = RAMPS[rampStyle];
   return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
+}
+
+// ===== GLYPH CACHE =====
+/**
+ * Pre-render every unique ascii character to a tiny buffer
+ * Using image() to blit cached glyphs is much faster than text() for many chars
+ */
+function buildGlyphCache() {
+  let allChars = new Set();
+  for (let ramp of Object.values(RAMPS)) {
+    for (let ch of ramp) if (ch !== ' ') allChars.add(ch);
+  }
+
+  let gw = ceil(DEMO_CELL_SIZE * 1.5);
+  let gh = ceil(DEMO_CELL_SIZE * 2);
+
+  for (let ch of allChars) {
+    let g = createGraphics(gw, gh);
+    g.textFont(FONT_FAMILY);
+    g.textSize(DEMO_CELL_SIZE);
+    g.textAlign(LEFT, TOP);
+    g.fill(COLOR_FG);
+    g.noStroke();
+    g.text(ch, 0, 0);
+    glyphCache[ch] = g;
+  }
 }
 
 // ===== DEMO IMAGES =====
@@ -192,7 +222,7 @@ function createDemo(raw) {
   let actualW = cellsX * DEMO_CELL_SIZE;
   let actualH = cellsY * DEMO_CELL_SIZE;
 
-  //pre-render the demo to an offscreen buffer for fast blitting when at rest
+  //pre-render to offscreen buffer for fast blitting when at rest
   let buffer = createGraphics(actualW, actualH);
   buffer.textFont(FONT_FAMILY);
   buffer.textSize(DEMO_CELL_SIZE);
@@ -202,7 +232,6 @@ function createDemo(raw) {
   buffer.clear();
   for (let c of chars) {
     if (c.char !== ' ') {
-      //chars are stored as center-relative, buffer needs top-left coords
       buffer.text(c.char, c.ox + actualW / 2, c.oy + actualH / 2);
     }
   }
@@ -222,7 +251,6 @@ function createDemo(raw) {
 
 /**
  * Pairwise collision resolution between demos
- * Treats each demo as a circle, does elastic bounce on impact
  */
 function resolveDemoCollisions() {
   for (let i = 0; i < demoImages.length; i++) {
@@ -234,8 +262,8 @@ function resolveDemoCollisions() {
       let dy = b.y - a.y;
       let distSq = dx * dx + dy * dy;
 
-      let ra = max(a.w, a.h) / 2;
-      let rb = max(b.w, b.h) / 2;
+      let ra = max(a.w, a.h) / 2 * COLLISION_RADIUS_SCALE;
+      let rb = max(b.w, b.h) / 2 * COLLISION_RADIUS_SCALE;
       let minDist = ra + rb;
 
       if (distSq < minDist * minDist && distSq > 0) {
@@ -246,7 +274,6 @@ function resolveDemoCollisions() {
         let va = a.vx * nx + a.vy * ny;
         let vb = b.vx * nx + b.vy * ny;
 
-        //only bounce if they're approaching, not separating
         if (va - vb > 0) {
           a.vx += (vb - va) * nx;
           a.vy += (vb - va) * ny;
@@ -254,7 +281,6 @@ function resolveDemoCollisions() {
           b.vy += (va - vb) * ny;
         }
 
-        //push them apart so they don't overlap next frame
         let overlap = (minDist - dist) / 2;
         a.x -= nx * overlap;
         a.y -= ny * overlap;
@@ -277,13 +303,10 @@ function drawDemos() {
     if (d.y > height - d.h / 2) { d.y = height - d.h / 2; d.vy *= -1; }
   }
 
-  // Pass 2: resolve collisions between demos
+  // Pass 2: pairwise collisions
   resolveDemoCollisions();
 
   // Pass 3: hover detection + drawing
-  //flags so we only set text state once when entering slow path
-  let textStateSet = false;
-
   for (let d of demoImages) {
     let dx = mouseX - d.x;
     let dy = mouseY - d.y;
@@ -292,21 +315,10 @@ function drawDemos() {
     let hovered = distSq < hoverRadius * hoverRadius;
 
     if (!hovered && !d.dispersed) {
-      //FAST PATH: blit the pre-rendered buffer (one call instead of thousands)
+      //FAST PATH: blit pre-rendered buffer (one call instead of thousands)
       image(d.buffer, d.x - d.w / 2, d.y - d.h / 2);
     } else {
-      //SLOW PATH: per-char render while dispersing or animating back
-      //only set text state once per frame, lazily
-      if (!textStateSet) {
-        textSize(DEMO_CELL_SIZE);
-        textAlign(LEFT, TOP);
-        textFont(FONT_FAMILY);
-        fill(COLOR_FG);
-        noStroke();
-        textStateSet = true;
-      }
-
-      //track max distance from home so we know when chars have settled
+      //SLOW PATH: per-char render via cached glyphs (faster than text())
       let maxDelta = 0;
       for (let c of d.chars) {
         let targetX = hovered ? c.ox + c.dispX * DEMO_DISPERSE_DIST : c.ox;
@@ -317,11 +329,21 @@ function drawDemos() {
         let delta = abs(c.cx - c.ox) + abs(c.cy - c.oy);
         if (delta > maxDelta) maxDelta = delta;
 
-        if (c.char !== ' ') text(c.char, d.x + c.cx, d.y + c.cy);
+        //blit pre-cached glyph (spaces aren't in cache, skip)
+        let g = glyphCache[c.char];
+        if (g) image(g, d.x + c.cx, d.y + c.cy);
       }
 
-      //once everything is back within threshold, switch to buffer rendering
-      d.dispersed = hovered || maxDelta > DEMO_SETTLE_THRESHOLD;
+      //snap chars to home when fully settled — prevents pop on swap to buffer
+      if (!hovered && maxDelta <= DEMO_SETTLE_THRESHOLD) {
+        for (let c of d.chars) {
+          c.cx = c.ox;
+          c.cy = c.oy;
+        }
+        d.dispersed = false;
+      } else {
+        d.dispersed = true;
+      }
     }
   }
 }
@@ -350,6 +372,7 @@ function setup() {
   });
 
   initDemoImages();
+  buildGlyphCache();
   pickSplashMessage();
   drawSplash();
 }
