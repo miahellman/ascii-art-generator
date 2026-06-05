@@ -2,7 +2,11 @@
 let img;
 let asciiChars = [];
 let drawIndex = 0;
-let cellSize = 6;
+
+//TWEAK: lower = more detail, higher = chunkier
+//range: 3 (very detailed, slower) to 8 (chunky, fast)
+let cellSize = 4;
+
 let imageLoaded = false;
 
 let input;
@@ -16,6 +20,15 @@ const BTN_H = 36;
 const MAX_ART_W = 800;
 const TOP_PAD = 80;
 const BOTTOM_PAD = 20;
+
+//TWEAK: how many characters get revealed per frame
+//bump this up if cellSize is small (lots of chars to draw)
+//range: 200 (slow reveal) to 1000 (almost instant)
+const REVEAL_SPEED = 500;
+
+//TWEAK: contrast boost applied before sampling
+//1.0 = no change, 1.4 = moderate punch, 1.8 = high contrast
+const CONTRAST = 1.4;
 
 //art bounds within the canvas
 let artX = 0, artY = 0, artW = 0, artH = 0;
@@ -124,6 +137,18 @@ function processImage() {
   let work = img.get();
   work.resize(artW / cellSize, artH / cellSize);
 
+  //apply contrast boost to make shading read more clearly
+  work.loadPixels();
+  for (let i = 0; i < work.pixels.length; i += 4) {
+    for (let j = 0; j < 3; j++) {
+      let v = work.pixels[i + j] / 255;
+      //pushes values away from middle gray
+      v = (v - 0.5) * CONTRAST + 0.5;
+      work.pixels[i + j] = constrain(v * 255, 0, 255);
+    }
+  }
+  work.updatePixels();
+
   for (let y = 0; y < work.height; y++) {
     for (let x = 0; x < work.width; x++) {
       let b = brightness(work.get(x, y));
@@ -143,8 +168,8 @@ function processImage() {
 function draw() {
   if (!imageLoaded) return;
 
-  //reveal 200 chars per frame
-  for (let i = 0; i < 200 && drawIndex < asciiChars.length; i++) {
+  //reveal characters per frame, controlled by REVEAL_SPEED constant up top
+  for (let i = 0; i < REVEAL_SPEED && drawIndex < asciiChars.length; i++) {
     let a = asciiChars[drawIndex++];
     fill(0);
     text(a.char, a.x, a.y);
@@ -185,6 +210,9 @@ function resetToSplash() {
 
 //brightness (0-255) to ascii character
 function getAsciiChar(brightness) {
-  let chars = "   .,:-=+$#";
-  return chars[floor(map(brightness, 0, 255, chars.length - 1, 0))];
+  //TWEAK: character ramp from lightest (space) to darkest ($)
+  //longer ramp = more shading levels = more detail
+  //try shorter ramps for chunkier styles: " .:-=+*#%@"
+  let chars = " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+  return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
 }
