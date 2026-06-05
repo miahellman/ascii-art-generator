@@ -40,14 +40,14 @@ let contrast = 1.4;
 //TWEAK: ramp styles — feel free to add your own, key shows in the dropdown
 //ramps go from lightest (left, sparse) to darkest (right, dense)
 const RAMPS = {
-  'classic':  "   .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
-  'minimal':  "   .:-=+*#%@",
-  'letters':  "   .lcvonxserwmkhpdbqgKZSXAVUOQNHMW@",
-  'symbols':  '   .,:;!?"\'`-_=+~*<>()[]{}|/\\&#%@$',
-  'blocks':   "   ░▒▓█",
-  'dots':     "   ··••●⬤",
-  'numbers':  "   1234567890",
-  'binary':   "   .01",
+  'classic':  "     .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  'minimal':  "     .:-=+*#%@",
+  'letters':  "     .lcvonxserwmkhpdbqgKZSXAVUOQNHMW@",
+  'symbols':  '     .,:;!?"\'`-_=+~*<>()[]{}|/\\&#%@$',
+  'blocks':   "     ░▒▓█",
+  'dots':     "     ··••●⬤",
+  'numbers':  "     1234567890",
+  'binary':   "     .01",
 };
 
 //TWEAK: starting ramp style
