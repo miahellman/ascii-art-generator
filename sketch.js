@@ -28,7 +28,7 @@ const BTN_H = 36;
 let contrast = 1.4;
 
 //TWEAK: invert colors
-let inverted = false;
+let inverted = true;
 
 // Demo image config
 const DEMO_FILES = ['images/1.jpg', 'images/2.png', 'images/3.jpg', 'images/4.jpg', 'images/5.jpg', 'images/m.png', 'images/i.png', 'images/a.png'];
