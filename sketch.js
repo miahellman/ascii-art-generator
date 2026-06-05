@@ -439,25 +439,26 @@ function addDropdown(labelText, options, initialValue, onChange) {
   return select;
 }
 
-//creates a labeled checkbox row inside the controls panel
+//creates a labeled checkbox row using pure DOM for reliability
 function addCheckbox(labelText, initialValue, onChange) {
-  let row = createDiv();
-  row.parent(controlsDiv);
-  row.style('margin-top', '12px');
-  row.style('display', 'flex');
-  row.style('align-items', 'center');
-  row.style('justify-content', 'space-between');
+  let row = document.createElement('div');
+  row.style.marginTop = '12px';
+  row.style.display = 'flex';
+  row.style.alignItems = 'center';
+  row.style.justifyContent = 'space-between';
 
-  let label = createDiv(labelText);
-  label.parent(row);
+  let label = document.createElement('div');
+  label.textContent = labelText;
+  row.appendChild(label);
 
   let cb = document.createElement('input');
   cb.type = 'checkbox';
   cb.className = 'ascii-checkbox';
   cb.checked = initialValue;
   cb.addEventListener('change', () => onChange(cb.checked));
-  row.elt.appendChild(cb);
+  row.appendChild(cb);
 
+  controlsDiv.elt.appendChild(row);
   return cb;
 }
 
