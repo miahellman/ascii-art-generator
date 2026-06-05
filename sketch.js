@@ -32,12 +32,12 @@ let inverted = true;
 
 // Demo image config
 const DEMO_FILES = ['images/1.jpg', 'images/2.png', 'images/3.jpg', 'images/4.jpg', 'images/5.jpg', 'images/m.png', 'images/i.png', 'images/a.png'];
-//const DEMO_FILES = ['images/m.png', 'images/i.png', 'images/a.png'];
 
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 8;
-//TWEAK: how big each floating demo is
-const DEMO_TARGET_SIZE = 200;
+//TWEAK: demo size — smaller on mobile, larger on desktop
+const DEMO_TARGET_SIZE_MOBILE = 100;
+const DEMO_TARGET_SIZE_DESKTOP = 300;
 //TWEAK: cell size for the demos
 const DEMO_CELL_SIZE = 7;
 //TWEAK: how fast the demos drift
@@ -124,6 +124,11 @@ function isNarrow() {
   return windowWidth < PANEL_W + PANEL_MARGIN * 2 + MAX_ART_SIZE + 40;
 }
 
+//returns the demo target size for the current viewport
+function getDemoTargetSize() {
+  return isNarrow() ? DEMO_TARGET_SIZE_MOBILE : DEMO_TARGET_SIZE_DESKTOP;
+}
+
 function pickSplashMessage() {
   currentSplashMessage = SPLASH_MESSAGES[floor(random(SPLASH_MESSAGES.length))];
 }
@@ -150,14 +155,15 @@ function initDemoImages() {
 }
 
 function createDemo(raw) {
+  let size = getDemoTargetSize();
   let aspect = raw.height / raw.width;
   let w, h;
   if (aspect > 1) {
-    h = DEMO_TARGET_SIZE;
-    w = DEMO_TARGET_SIZE / aspect;
+    h = size;
+    w = size / aspect;
   } else {
-    w = DEMO_TARGET_SIZE;
-    h = DEMO_TARGET_SIZE * aspect;
+    w = size;
+    h = size * aspect;
   }
 
   let cellsX = floor(w / DEMO_CELL_SIZE);
@@ -485,6 +491,12 @@ function windowResized() {
     }, RESIZE_DEBOUNCE);
   } else {
     resizeCanvas(windowWidth, windowHeight);
+    //regenerate demos if we crossed the mobile/desktop boundary
+    let firstDemoSize = demoImages.length > 0 ? max(demoImages[0].w, demoImages[0].h) : 0;
+    let targetSize = getDemoTargetSize();
+    if (abs(firstDemoSize - targetSize) > 50) {
+      initDemoImages();
+    }
     drawSplash();
   }
 }
