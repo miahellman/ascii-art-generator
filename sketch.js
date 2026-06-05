@@ -12,8 +12,6 @@ const MAX_ART_SIZE = 800;
 
 const PANEL_W = 200;
 const PANEL_MARGIN = 20;
-
-//approximate height of the panel in narrow mode — used for layout below it
 const NARROW_PANEL_H = 270;
 
 const TOP_PAD = 80;
@@ -29,10 +27,24 @@ const BTN_H = 36;
 //TWEAK: starting contrast
 let contrast = 1.4;
 
-//TWEAK: invert colors (black background, white text in the art region)
+//TWEAK: invert colors
 let inverted = false;
 
-// Color/Style constants
+// Demo image config
+const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
+//TWEAK: how big each floating demo is (in pixels along the longer side)
+const DEMO_TARGET_SIZE = 100;
+//TWEAK: cell size for the demos (smaller = more detail per demo)
+const DEMO_CELL_SIZE = 3;
+//TWEAK: how fast the demos drift around
+const DEMO_BASE_SPEED = 0.8;
+//TWEAK: how close mouse needs to be (in px, added to image radius) to trigger dispersion
+const DEMO_HOVER_PAD = 20;
+//TWEAK: how far chars fly when dispersed
+const DEMO_DISPERSE_DIST = 150;
+//TWEAK: smoothing factor — lower = slower drift back, higher = snappier
+const DEMO_LERP = 0.08;
+
 const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
 const COLOR_TEXT_LIGHT = '#fff';
@@ -43,8 +55,6 @@ const FONT_SIZE_SPLASH = 12;
 const FONT_SIZE_CONTROLS = 12;
 const FONT_SIZE_LABEL = 14;
 
-//TWEAK: ramp styles — feel free to add your own, key shows in the dropdown
-//ramps go from lightest (left, sparse) to darkest (right, dense)
 const RAMPS = {
   'classic':  " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
   'minimal':  " .:-=+*#%@",
@@ -57,10 +67,8 @@ const RAMPS = {
   'braille':  " ⣀⣄⣤⣦⣶⣷⣿",
 };
 
-//TWEAK: starting ramp style
 let rampStyle = 'classic';
 
-//TWEAK: random splash subtitle messages
 const SPLASH_MESSAGES = [
   'just do it',
   'you aren\'t curious to \nsee what will happen?',
@@ -93,6 +101,21 @@ let resizeTimer = null;
 let currentSplashMessage = '';
 let artX = 0, artY = 0, artW = 0, artH = 0;
 
+// Demo image state
+let demoRawImages = [];
+let demoImages = [];
+
+// ===== PRELOAD =====
+function preload() {
+  for (let f of DEMO_FILES) {
+    demoRawImages.push(loadImage(
+      f,
+      null,
+      () => console.warn('Could not load demo image:', f)
+    ));
+  }
+}
+
 // ===== UTILITY FUNCTIONS =====
 function isNarrow() {
   return windowWidth < PANEL_W + PANEL_MARGIN * 2 + MAX_ART_SIZE + 40;
@@ -102,18 +125,127 @@ function pickSplashMessage() {
   currentSplashMessage = SPLASH_MESSAGES[floor(random(SPLASH_MESSAGES.length))];
 }
 
-/**
- * Extract brightness from a pixel using luminosity formula
- * Faster than p5's brightness() function when used in loops
- */
 function getPixelBrightness(pixels, index) {
-  // Standard luminosity formula: 0.299*R + 0.587*G + 0.114*B
   return pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114;
 }
 
 function getAsciiChar(brightness) {
   let chars = RAMPS[rampStyle];
   return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
+}
+
+// ===== DEMO IMAGES =====
+/**
+ * Build the demoImages array from the preloaded raw images
+ * Each demo has ASCII char data plus position/velocity for bouncing
+ */
+function initDemoImages() {
+  demoImages = [];
+  for (let raw of demoRawImages) {
+    if (!raw || !raw.width) continue;
+    demoImages.push(createDemo(raw));
+  }
+}
+
+function createDemo(raw) {
+  // Scale image to fit within DEMO_TARGET_SIZE while preserving aspect ratio
+  let aspect = raw.height / raw.width;
+  let w, h;
+  if (aspect > 1) {
+    h = DEMO_TARGET_SIZE;
+    w = DEMO_TARGET_SIZE / aspect;
+  } else {
+    w = DEMO_TARGET_SIZE;
+    h = DEMO_TARGET_SIZE * aspect;
+  }
+
+  let cellsX = floor(w / DEMO_CELL_SIZE);
+  let cellsY = floor(h / DEMO_CELL_SIZE);
+
+  // Convert to ASCII
+  let work = raw.get();
+  work.resize(cellsX, cellsY);
+  work.loadPixels();
+
+  let chars = [];
+  for (let y = 0; y < cellsY; y++) {
+    for (let x = 0; x < cellsX; x++) {
+      let idx = (y * cellsX + x) * 4;
+      let b = getPixelBrightness(work.pixels, idx);
+      let ch = getAsciiChar(b);
+
+      // Position relative to demo image center
+      let ox = (x - cellsX / 2) * DEMO_CELL_SIZE;
+      let oy = (y - cellsY / 2) * DEMO_CELL_SIZE;
+
+      // Each char gets a random outward direction for dispersion
+      let angle = random(TWO_PI);
+
+      chars.push({
+        ox: ox, oy: oy,    // home position (offset from center)
+        cx: ox, cy: oy,    // current position (offset from center)
+        char: ch,
+        dispX: cos(angle), // unit vector for dispersion direction
+        dispY: sin(angle),
+      });
+    }
+  }
+
+  let actualW = cellsX * DEMO_CELL_SIZE;
+  let actualH = cellsY * DEMO_CELL_SIZE;
+
+  // Random initial position with some padding from edges
+  return {
+    chars: chars,
+    x: random(actualW, windowWidth - actualW),
+    y: random(actualH, windowHeight - actualH),
+    vx: random([-1, 1]) * DEMO_BASE_SPEED * random(0.6, 1.4),
+    vy: random([-1, 1]) * DEMO_BASE_SPEED * random(0.6, 1.4),
+    w: actualW,
+    h: actualH,
+  };
+}
+
+/**
+ * Update + draw all demos for the current frame
+ * Handles bouncing and mouse-hover dispersion
+ */
+function drawDemos() {
+  textSize(DEMO_CELL_SIZE);
+  textAlign(LEFT, TOP);
+  textFont(FONT_FAMILY);
+  fill(COLOR_FG);
+  noStroke();
+
+  for (let d of demoImages) {
+    // Update position
+    d.x += d.vx;
+    d.y += d.vy;
+
+    // Bounce off edges
+    if (d.x < d.w / 2) { d.x = d.w / 2; d.vx *= -1; }
+    if (d.x > width - d.w / 2) { d.x = width - d.w / 2; d.vx *= -1; }
+    if (d.y < d.h / 2) { d.y = d.h / 2; d.vy *= -1; }
+    if (d.y > height - d.h / 2) { d.y = height - d.h / 2; d.vy *= -1; }
+
+    // Mouse hover check (distance from demo center)
+    let dx = mouseX - d.x;
+    let dy = mouseY - d.y;
+    let distSq = dx * dx + dy * dy;
+    let hoverRadius = max(d.w, d.h) / 2 + DEMO_HOVER_PAD;
+    let hovered = distSq < hoverRadius * hoverRadius;
+
+    // Animate each character toward its target (home or dispersed)
+    for (let c of d.chars) {
+      let targetX = hovered ? c.ox + c.dispX * DEMO_DISPERSE_DIST : c.ox;
+      let targetY = hovered ? c.oy + c.dispY * DEMO_DISPERSE_DIST : c.oy;
+      c.cx = lerp(c.cx, targetX, DEMO_LERP);
+      c.cy = lerp(c.cy, targetY, DEMO_LERP);
+
+      // Skip blank chars (saves a lot of text() calls)
+      if (c.char !== ' ') text(c.char, d.x + c.cx, d.y + c.cy);
+    }
+  }
 }
 
 // ===== SETUP & STYLING =====
@@ -133,13 +265,13 @@ function setup() {
   styleButton(uploadButton);
   uploadButton.mousePressed(() => input.elt.click());
 
-  // Keyboard support: Enter key to upload when on splash
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !imageLoaded) {
       input.elt.click();
     }
   });
 
+  initDemoImages();
   pickSplashMessage();
   drawSplash();
 }
@@ -247,8 +379,20 @@ function styleButton(btn) {
   btn.elt.addEventListener('mouseleave', () => apply());
 }
 
+/**
+ * Initializes splash state — positions the upload button
+ * The actual rendering happens every frame in draw()
+ */
 function drawSplash() {
-  background(COLOR_BG);
+  uploadButton.show();
+  uploadButton.position(width / 2 - BTN_W / 2, height / 4);
+}
+
+/**
+ * Draws the title + subtitle text on top of the demo background
+ * Called every frame from draw() when on splash
+ */
+function drawSplashOverlay() {
   fill(COLOR_FG);
   textFont(FONT_FAMILY);
   textAlign(CENTER, CENTER);
@@ -256,9 +400,6 @@ function drawSplash() {
   let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : '';
   textSize(FONT_SIZE_TITLE);
   text(title, width / 2, height / 4 - 40);
-
-  uploadButton.show();
-  uploadButton.position(width / 2 - BTN_W / 2, height / 4);
 
   textSize(FONT_SIZE_SPLASH);
   text(currentSplashMessage, width / 2, height / 4 + BTN_H + 25);
@@ -284,7 +425,6 @@ function windowResized() {
 function handleFile(file) {
   if (!file) return;
 
-  // FIXED: p5's file wrapper sets file.type to just 'image', not 'image/png' etc.
   if (file.type !== 'image') {
     console.warn('Please upload an image file (JPG, PNG, GIF, etc.)');
     return;
@@ -293,9 +433,7 @@ function handleFile(file) {
   img = loadImage(
     file.data,
     processImage,
-    (err) => {
-      console.error('Failed to load image:', err);
-    }
+    (err) => console.error('Failed to load image:', err)
   );
 
   uploadButton.hide();
@@ -340,7 +478,6 @@ function processImage() {
     artY = TOP_PAD + BTN_H + 20;
   }
 
-  // Paint art region black if inverted
   if (inverted) {
     noStroke();
     fill(COLOR_FG);
@@ -385,8 +522,15 @@ function processImage() {
 
 // ===== DRAWING & ANIMATION =====
 function draw() {
-  if (!imageLoaded) return;
+  if (!imageLoaded) {
+    // Splash mode — animated demos every frame
+    background(COLOR_BG);
+    drawDemos();
+    drawSplashOverlay();
+    return;
+  }
 
+  // Generation mode — reveal ASCII chars progressively
   for (let i = 0; i < REVEAL_SPEED && drawIndex < asciiChars.length; i++) {
     let a = asciiChars[drawIndex++];
     fill(inverted ? COLOR_TEXT_LIGHT : COLOR_FG);
@@ -462,7 +606,6 @@ function buildControls() {
     rampStyle = v;
     scheduleRegen();
   });
-  // invert toggle
   addCheckbox('invert', inverted, v => {
     inverted = v;
     scheduleRegen();
