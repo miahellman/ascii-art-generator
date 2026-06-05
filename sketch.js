@@ -20,9 +20,15 @@ let countdownStart = 0;
 let countdownDuration = 3000;
 let buttonsShown = false;
 
-//button size constants
+//button size and layout constants
 const BTN_WIDTH = 140;
 const BTN_HEIGHT = 36;
+//max width the ascii art is allowed to be
+const MAX_ART_WIDTH = 800;
+//padding between top of canvas, buttons, art, and bottom
+const TOP_PAD = 20;
+const BTN_GAP = 20;
+const BOTTOM_PAD = 20;
 
 //bounds of the ascii art block within the canvas
 let artX = 0;
@@ -31,15 +37,12 @@ let artW = 0;
 let artH = 0;
 
 function setup() {
-  //canvas fills the window for responsive embedding
   createCanvas(windowWidth, windowHeight);
   background(255);
 
-  //hidden file input triggered by the custom upload button
   input = createFileInput(handleFile);
   input.hide();
 
-  //splash screen upload button
   uploadButton = createButton('upload image');
   styleButton(uploadButton);
   uploadButton.mousePressed(() => input.elt.click());
@@ -67,34 +70,51 @@ function btnStyle(bg, fg) {
 function styleButton(btn) {
   const base = btnStyle('#000', '#fff');
   const hover = btnStyle('#fff', '#000');
-  //set the full style string at once with !important to beat any editor css
   btn.elt.setAttribute('style', base);
   btn.elt.addEventListener('mouseenter', () => btn.elt.setAttribute('style', hover));
   btn.elt.addEventListener('mouseleave', () => btn.elt.setAttribute('style', base));
 }
 
-//draws splash screen with title and upload button
+//draws splash screen with title, upload button, and instruction below it
 function drawSplash() {
   background(255);
   fill(0);
   textAlign(CENTER, CENTER);
 
-  //title
+  //title above the button
   textSize(24);
-  text('mia hellman', width / 2, height / 2 - 50);
-  //instruction
-  textSize(12);
-  text('^ just do it', width / 2, height / 2 - 20);
+  text('mia hellman', width / 2, height / 2 - 40);
 
-  //center upload button on the same axis as the text
+  //center upload button on the same x axis as the text
   uploadButton.show();
   uploadButton.position(width / 2 - BTN_WIDTH / 2, height / 2);
+
+  //instruction below the button
+  textSize(12);
+  text('^ just do it', width / 2, height / 2 + BTN_HEIGHT + 25);
 }
 
-//keeps canvas responsive
+//keeps everything responsive when the iframe/window resizes
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  if (!imageLoaded && !buttonsShown) drawSplash();
+  if (imageLoaded || buttonsShown) {
+    //re-render the art at the new size using the cached original image
+    processImage();
+    //if buttons are already shown, reposition them; otherwise let the countdown re-fire
+    if (buttonsShown) {
+      buttonsShown = false;
+      countdownActive = false;
+      drawIndex = asciiChars.length; //skip the draw animation, jump to done state
+      //force-draw all chars immediately so user doesn't see a redraw flash
+      fill(0);
+      textAlign(LEFT, TOP);
+      textSize(cellSize);
+      for (let c of asciiChars) text(c.char, c.x, c.y);
+      showButtons();
+    }
+  } else {
+    resizeCanvas(windowWidth, windowHeight);
+    drawSplash();
+  }
 }
 
 //runs when user picks a file
@@ -110,31 +130,39 @@ function handleFile(file) {
 }
 
 //converts uploaded image into ascii character data
+//uses a fresh copy each time so img stays pristine for re-renders on resize
 function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  //ascii art is as wide as the window, height follows the image's aspect ratio
-  //rounded to multiples of cellSize so the grid is clean
+  //art width: window width, capped at MAX_ART_WIDTH
   let imgAspect = img.height / img.width;
-  artW = floor(windowWidth / cellSize) * cellSize;
+  artW = floor(min(windowWidth, MAX_ART_WIDTH) / cellSize) * cellSize;
   artH = floor((artW * imgAspect) / cellSize) * cellSize;
 
-  //canvas stays full window size so we can center the art and place buttons above it
-  resizeCanvas(windowWidth, windowHeight);
+  //canvas grows to fit art plus buttons and padding, but never shorter than the window
+  let neededHeight = TOP_PAD + BTN_HEIGHT + BTN_GAP + artH + BOTTOM_PAD;
+  let canvasHeight = max(windowHeight, neededHeight);
+  resizeCanvas(windowWidth, canvasHeight);
   background(255);
 
-  //center horizontally, push down vertically to leave room for buttons above
+  //horizontally center the art
   artX = floor((width - artW) / 2);
-  artY = floor((height - artH) / 2) + BTN_HEIGHT + 20;
+  //vertically: center within the visible window area when there's room,
+  //otherwise pin near the top so buttons stay in view
+  if (canvasHeight === windowHeight) {
+    artY = floor((height - artH) / 2) + BTN_HEIGHT / 2 + BTN_GAP / 2;
+  } else {
+    artY = TOP_PAD + BTN_HEIGHT + BTN_GAP;
+  }
 
-  //resize image so each pixel = one ascii cell
-  img.resize(artW / cellSize, artH / cellSize);
+  //work on a copy so the original img isn't mutated by resize
+  let work = img.get();
+  work.resize(artW / cellSize, artH / cellSize);
 
-  //build the character array offset into the centered art region
-  for (let y = 0; y < img.height; y++) {
-    for (let x = 0; x < img.width; x++) {
-      let c = img.get(x, y);
+  for (let y = 0; y < work.height; y++) {
+    for (let x = 0; x < work.width; x++) {
+      let c = work.get(x, y);
       asciiChars.push({
         x: artX + x * cellSize,
         y: artY + y * cellSize,
@@ -167,7 +195,7 @@ function draw() {
     countdownStart = millis();
   }
 
-  //show buttons after the countdown completes
+  //show buttons after countdown completes
   if (countdownActive && millis() - countdownStart >= countdownDuration) {
     countdownActive = false;
     showButtons();
@@ -178,20 +206,18 @@ function draw() {
 function showButtons() {
   buttonsShown = true;
 
-  //save button above the top-left corner of the art
   saveButton = createButton('save image');
   styleButton(saveButton);
-  saveButton.position(artX, artY - BTN_HEIGHT - 20);
+  saveButton.position(artX, artY - BTN_HEIGHT - BTN_GAP);
   saveButton.mousePressed(() => saveCanvas('ascii-art', 'png'));
 
-  //upload-new button above the top-right corner of the art
   newFileButton = createButton('upload new');
   styleButton(newFileButton);
-  newFileButton.position(artX + artW - BTN_WIDTH, artY - BTN_HEIGHT - 20);
+  newFileButton.position(artX + artW - BTN_WIDTH, artY - BTN_HEIGHT - BTN_GAP);
   newFileButton.mousePressed(resetToSplash);
 }
 
-//tears down the current art and returns to splash
+//tears down current art and returns to splash
 function resetToSplash() {
   imageLoaded = false;
   asciiChars = [];
@@ -209,7 +235,7 @@ function resetToSplash() {
 //maps brightness (0-255) to an ascii character
 function getAsciiChar(brightness) {
   //gradient from lightest (spaces) to darkest (#)
-  let chars = "   .,:-=+$#";
+  let chars = "     .,:-=+$#";
   let index = floor(map(brightness, 0, 255, chars.length - 1, 0));
   return chars[index];
 }
