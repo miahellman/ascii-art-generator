@@ -1,2 +1,2 @@
 # ascii-art-generator
-it's in the repo name
+for the cover of my personal website
