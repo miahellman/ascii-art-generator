@@ -81,7 +81,7 @@ function pickSplashMessage() {
 function setup() {
   createCanvas(windowWidth, windowHeight);
   background(255);
-  textFont('JetBrains Mono');
+  textFont('Noto Sans Mono');
 
   //inject slider + dropdown styles
   let styleTag = document.createElement('style');
@@ -121,7 +121,7 @@ function setup() {
       border: 2px solid #fff;
       border-radius: 0;
       padding: 6px 8px;
-      font-family: JetBrains Mono, Courier New, monospace;
+      font-family: Noto Sans Mono;
       font-size: 12px;
       cursor: pointer;
       outline: none;
@@ -155,7 +155,7 @@ function styleButton(btn) {
     'border-radius': '0',
     'padding': '8px 16px',
     'width': BTN_W + 'px',
-    'font-family': 'JetBrains Mono, Courier New, monospace',
+    'font-family': 'Noto Sans Mono',
     'font-size': '14px',
     'cursor': 'pointer',
     'box-sizing': 'border-box',
@@ -175,7 +175,7 @@ function styleButton(btn) {
 function drawSplash() {
   background(255);
   fill(0);
-  textFont('JetBrains Mono, Courier New, monospace');
+  textFont('Noto Sans Mono');
   textAlign(CENTER, CENTER);
 
   let title = hasGeneratedOnce ? 'ascii art generator' : 'mia hellman';
@@ -270,7 +270,7 @@ function processImage() {
   hasGeneratedOnce = true;
   textAlign(LEFT, TOP);
   //monospace for ascii so columns align and unicode block/dot chars render properly
-  textFont('JetBrains Mono, Courier New, monospace');
+  textFont('Noto Sans Mono');
   textSize(cellSize);
 
   if (controlsDiv) positionControls();
@@ -312,7 +312,7 @@ function buildControls() {
   controlsDiv.style('background', '#000');
   controlsDiv.style('color', '#fff');
   controlsDiv.style('padding', '16px');
-  controlsDiv.style('font-family', 'JetBrains Mono, Courier New, monospace');
+  controlsDiv.style('font-family', 'Noto Sans Mono');
   controlsDiv.style('font-size', '12px');
   controlsDiv.style('width', PANEL_W - 32 + 'px');
   controlsDiv.style('border', '2px solid #000');
