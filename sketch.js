@@ -179,7 +179,7 @@ function drawSplash() {
   textFont('JetBrains Mono');
   textAlign(CENTER, CENTER);
 
-  let title = hasGeneratedOnce ? 'ascii art generator' : 'mia hellman';
+  let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : 'mia hellman';
   textSize(24);
   text(title, width / 2, height / 2 - 40);
 
