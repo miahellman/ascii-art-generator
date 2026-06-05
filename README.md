@@ -1,5 +1,5 @@
 # ascii-art-generator
-it's in the name
+it's in the name:)
 
 upload an image and convert to ascii text, numbers, characters, etc
 
