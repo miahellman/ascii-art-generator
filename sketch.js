@@ -30,7 +30,7 @@ const PANEL_W = 200;
 const PANEL_MARGIN = 20;
 
 //approximate height of the panel in narrow mode — used for layout below it
-const NARROW_PANEL_H = 240;
+const NARROW_PANEL_H = 270;
 
 const TOP_PAD = 80;
 const BOTTOM_PAD = 60;
@@ -39,6 +39,9 @@ const REVEAL_SPEED = 500;
 
 //TWEAK: starting contrast
 let contrast = 1.4;
+
+//TWEAK: invert colors (black background, white text in the art region)
+let inverted = false;
 
 //TWEAK: ramp styles — feel free to add your own, key shows in the dropdown
 //ramps go from lightest (left, sparse) to darkest (right, dense)
@@ -87,7 +90,7 @@ function setup() {
   background(255);
   textFont('JetBrains Mono');
 
-  //inject slider + dropdown styles
+  //inject slider + dropdown + checkbox styles
   let styleTag = document.createElement('style');
   styleTag.textContent = `
     input[type=range].ascii-slider {
@@ -136,6 +139,30 @@ function setup() {
     select.ascii-select:hover {
       background: #000;
       color: #fff;
+    }
+    input[type=checkbox].ascii-checkbox {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border: 2px solid #fff;
+      border-radius: 0;
+      cursor: pointer;
+      margin: 0;
+      position: relative;
+      box-sizing: border-box;
+    }
+    input[type=checkbox].ascii-checkbox:checked::after {
+      content: 'X';
+      color: #000;
+      position: absolute;
+      top: -3px;
+      left: 1px;
+      font-size: 14px;
+      font-family: JetBrains Mono;
+      font-weight: bold;
+      line-height: 1;
     }
   `;
   document.head.appendChild(styleTag);
@@ -232,10 +259,8 @@ function processImage() {
   artW = floor(targetW / cellSize) * cellSize;
   artH = floor(targetH / cellSize) * cellSize;
 
-  //canvas size + art position depends on layout
   let canvasH;
   if (isNarrow()) {
-    //narrow: panel at top, buttons below panel, art below buttons
     canvasH = max(windowHeight, TOP_PAD + NARROW_PANEL_H + 20 + BTN_H + 20 + artH + BOTTOM_PAD);
   } else {
     canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
@@ -244,14 +269,19 @@ function processImage() {
   background(255);
 
   if (isNarrow()) {
-    //art is below panel and buttons
     artX = floor((width - artW) / 2);
     artY = TOP_PAD + NARROW_PANEL_H + 20 + BTN_H + 20;
   } else {
-    //art is to the right of the panel
     let rightAreaStart = PANEL_W + PANEL_MARGIN * 2;
     artX = rightAreaStart + floor((width - rightAreaStart - artW) / 2);
     artY = TOP_PAD + BTN_H + 20;
+  }
+
+  //paint the art region black if inverted — only the art zone, not the whole canvas
+  if (inverted) {
+    noStroke();
+    fill(0);
+    rect(artX, artY, artW, artH);
   }
 
   let work = img.get();
@@ -293,7 +323,8 @@ function draw() {
 
   for (let i = 0; i < REVEAL_SPEED && drawIndex < asciiChars.length; i++) {
     let a = asciiChars[drawIndex++];
-    fill(0);
+    //white text when inverted, black otherwise
+    fill(inverted ? 255 : 0);
     text(a.char, a.x, a.y);
   }
 
@@ -315,7 +346,6 @@ function showButtons() {
   styleButton(newFileButton);
   newFileButton.mousePressed(resetToSplash);
 
-  //position the buttons based on layout
   if (isNarrow()) {
     //narrow: both centered, side by side, below the panel
     let pairW = BTN_W * 2 + 10;
@@ -368,6 +398,11 @@ function buildControls() {
     rampStyle = v;
     scheduleRegen();
   });
+  //invert toggle
+  addCheckbox('invert', inverted, v => {
+    inverted = v;
+    scheduleRegen();
+  });
 }
 
 function addSlider(labelText, min, max, val, step, onChange) {
@@ -402,6 +437,28 @@ function addDropdown(labelText, options, initialValue, onChange) {
   select.addEventListener('change', () => onChange(select.value));
   controlsDiv.elt.appendChild(select);
   return select;
+}
+
+//creates a labeled checkbox row inside the controls panel
+function addCheckbox(labelText, initialValue, onChange) {
+  let row = createDiv();
+  row.parent(controlsDiv);
+  row.style('margin-top', '12px');
+  row.style('display', 'flex');
+  row.style('align-items', 'center');
+  row.style('justify-content', 'space-between');
+
+  let label = createDiv(labelText);
+  label.parent(row);
+
+  let cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'ascii-checkbox';
+  cb.checked = initialValue;
+  cb.addEventListener('change', () => onChange(cb.checked));
+  row.elt.appendChild(cb);
+
+  return cb;
 }
 
 function positionControls() {
