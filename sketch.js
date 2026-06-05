@@ -35,9 +35,6 @@ const DEMO_FILES = ['images/1.jpg', 'images/2.png', 'images/3.jpg', 'images/4.jp
 
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 8;
-//TWEAK: demo size — smaller on mobile, larger on desktop
-const DEMO_TARGET_SIZE_MOBILE = 100;
-const DEMO_TARGET_SIZE_DESKTOP = 300;
 //TWEAK: cell size for the demos
 const DEMO_CELL_SIZE = 7;
 //TWEAK: how fast the demos drift
@@ -52,6 +49,14 @@ const DEMO_LERP = 0.1;
 const DEMO_SETTLE_THRESHOLD = .75;
 //TWEAK: collision radius as a fraction of demo size — lower = more overlap before bouncing
 const COLLISION_RADIUS_SCALE = 0.75;
+
+//TWEAK: demo size — small on mobile, medium on tablet, large on desktop
+const DEMO_TARGET_SIZE_MOBILE = 100;
+const DEMO_TARGET_SIZE_TABLET = 200;
+const DEMO_TARGET_SIZE_DESKTOP = 300;
+//TWEAK: breakpoints for the size tiers (in pixels)
+const MOBILE_BREAKPOINT = 600;
+const TABLET_BREAKPOINT = 1060;
 
 const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
@@ -126,7 +131,9 @@ function isNarrow() {
 
 //returns the demo target size for the current viewport
 function getDemoTargetSize() {
-  return isNarrow() ? DEMO_TARGET_SIZE_MOBILE : DEMO_TARGET_SIZE_DESKTOP;
+  if (windowWidth < MOBILE_BREAKPOINT) return DEMO_TARGET_SIZE_MOBILE;
+  if (windowWidth < TABLET_BREAKPOINT) return DEMO_TARGET_SIZE_TABLET;
+  return DEMO_TARGET_SIZE_DESKTOP;
 }
 
 function pickSplashMessage() {
