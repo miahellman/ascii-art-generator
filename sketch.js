@@ -251,7 +251,7 @@ function drawSplash() {
   textFont(FONT_FAMILY);
   textAlign(CENTER, CENTER);
 
-  let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : 'mia hellman';
+  let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : '';
   textSize(FONT_SIZE_TITLE);
   text(title, width / 2, height / 2 - 40);
 
