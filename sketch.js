@@ -19,33 +19,36 @@ let buttonsShown = false;
 //used to swap the splash title from "mia hellman" to "ascii art generator"
 let hasGeneratedOnce = false;
 
-//slider controls (created after first generation)
+//slider controls
 let controlsDiv;
 let cellSizeSlider;
 let contrastSlider;
 let rampSlider;
-//timer handle for debouncing slider input
 let regenTimer = null;
 
 const BTN_W = 140;
 const BTN_H = 36;
-const MAX_ART_W = 800;
+
+//TWEAK: max width AND height the art can be — image scales down to fit inside this box
+const MAX_ART_SIZE = 550;
+
+//panel total width including padding + border, used for layout math
+const PANEL_W = 192;
+//gap between panel and art on wide screens
+const COL_GAP = 30;
+
 const TOP_PAD = 80;
-const BOTTOM_PAD = 200;
+const BOTTOM_PAD = 40;
 
 //TWEAK: how many characters get revealed per frame
-//bump this up if cellSize is small (lots of chars to draw)
-//range: 200 (slow reveal) to 1000 (almost instant)
 const REVEAL_SPEED = 500;
 
 //TWEAK: starting contrast — sliders override this once visible
 let contrast = 1.4;
 
-//TWEAK: starting ramp length — sliders override this once visible
-//0 = short chunky ramp, 1 = long detailed ramp
+//TWEAK: starting ramp length — 0 = short chunky, 1 = long detailed
 let rampDetail = 1;
 
-//two ramps to choose between via the detail slider
 const RAMP_SHORT = " .:-=+*#%@";
 const RAMP_LONG = " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
@@ -58,7 +61,8 @@ function setup() {
   textFont('Helvetica');
 
   //inject css for the range sliders so they match the button style
-  createElement('style', `
+  let styleTag = document.createElement('style');
+  styleTag.textContent = `
     input[type=range].ascii-slider {
       -webkit-appearance: none;
       appearance: none;
@@ -87,7 +91,8 @@ function setup() {
       border-radius: 0;
       cursor: pointer;
     }
-  `);
+  `;
+  document.head.appendChild(styleTag);
 
   input = createFileInput(handleFile);
   input.hide();
@@ -125,8 +130,7 @@ function styleButton(btn) {
   btn.elt.addEventListener('mouseleave', () => apply());
 }
 
-//splash: title, button, instruction below
-//title is "mia hellman" on first load, "ascii art generator" after that
+//splash screen
 function drawSplash() {
   background(255);
   fill(0);
@@ -143,7 +147,6 @@ function drawSplash() {
   text('^ just do it', width / 2, height / 2 + BTN_H + 25);
 }
 
-//re-render at new size when window resizes
 function windowResized() {
   if (imageLoaded) {
     if (newFileButton) newFileButton.hide();
@@ -172,19 +175,55 @@ function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  //art width capped at MAX_ART_W, height follows aspect ratio
+  //scale image to fit within MAX_ART_SIZE x MAX_ART_SIZE, preserving aspect ratio
   let imgAspect = img.height / img.width;
-  artW = floor(min(windowWidth, MAX_ART_W) / cellSize) * cellSize;
-  artH = floor((artW * imgAspect) / cellSize) * cellSize;
+  let targetW, targetH;
+  if (imgAspect > 1) {
+    //taller than wide: height is the constraint
+    targetH = MAX_ART_SIZE;
+    targetW = MAX_ART_SIZE / imgAspect;
+  } else {
+    //wider than tall: width is the constraint
+    targetW = MAX_ART_SIZE;
+    targetH = MAX_ART_SIZE * imgAspect;
+  }
+  //round to multiples of cellSize for a clean grid
+  artW = floor(targetW / cellSize) * cellSize;
+  artH = floor(targetH / cellSize) * cellSize;
 
-  //canvas grows to fit everything
-  let canvasH = max(windowHeight, TOP_PAD + artH + BOTTOM_PAD);
+  //decide layout based on available width
+  //wide: panel + gap + art fits in window
+  //narrow: stack panel below art
+  let wideLayout = (PANEL_W + COL_GAP + artW + 40) <= windowWidth;
+
+  //compute canvas height based on layout
+  let canvasH;
+  if (wideLayout) {
+    //tallest column wins (art column includes buttons above it)
+    let artColH = BTN_H + 20 + artH;
+    let panelColH = 220; //approximate panel height — adjust if you add more sliders
+    canvasH = TOP_PAD + max(artColH, panelColH) + BOTTOM_PAD;
+  } else {
+    //stacked: buttons + art + gap + panel
+    canvasH = TOP_PAD + BTN_H + 20 + artH + 30 + 220 + BOTTOM_PAD;
+  }
+  canvasH = max(windowHeight, canvasH);
+
   resizeCanvas(windowWidth, canvasH);
   background(255);
 
-  //horizontally centered, pinned to top
-  artX = floor((width - artW) / 2);
-  artY = TOP_PAD;
+  //position the art column
+  if (wideLayout) {
+    //panel on left, art on right — center the combined block
+    let totalW = PANEL_W + COL_GAP + artW;
+    let blockX = floor((width - totalW) / 2);
+    artX = blockX + PANEL_W + COL_GAP;
+    artY = TOP_PAD + BTN_H + 20; //leave room for buttons above
+  } else {
+    //art centered, full width if it fits
+    artX = floor((width - artW) / 2);
+    artY = TOP_PAD + BTN_H + 20;
+  }
 
   //work on a copy so img stays pristine for resizes
   let work = img.get();
@@ -217,8 +256,7 @@ function processImage() {
   textAlign(LEFT, TOP);
   textSize(cellSize);
 
-  //reposition the panel since the art bounds may have changed
-  if (controlsDiv) positionControls();
+  if (controlsDiv) positionControls(wideLayout);
 }
 
 function draw() {
@@ -233,10 +271,10 @@ function draw() {
   if (drawIndex >= asciiChars.length && !buttonsShown) showButtons();
 }
 
-//save + upload-new buttons, plus the slider control panel
 function showButtons() {
   buttonsShown = true;
 
+  //save in top-left of art, upload-new in top-right
   saveButton = createButton('save image');
   styleButton(saveButton);
   saveButton.position(artX, artY - BTN_H - 20);
@@ -249,10 +287,12 @@ function showButtons() {
 
   if (!controlsDiv) buildControls();
   controlsDiv.show();
-  positionControls();
+  //figure out current layout for positioning
+  let wideLayout = (PANEL_W + COL_GAP + artW + 40) <= windowWidth;
+  positionControls(wideLayout);
 }
 
-//creates the slider panel — runs once after first generation
+//creates the slider panel — runs once
 function buildControls() {
   controlsDiv = createDiv();
   controlsDiv.style('position', 'absolute');
@@ -264,6 +304,7 @@ function buildControls() {
   controlsDiv.style('width', '160px');
   controlsDiv.style('border', '2px solid #000');
   controlsDiv.style('box-sizing', 'border-box');
+  controlsDiv.style('z-index', '1000');
 
   cellSizeSlider = addSlider('cell size', 3, 10, cellSize, 1, v => {
     cellSize = v;
@@ -279,7 +320,6 @@ function buildControls() {
   });
 }
 
-//helper that creates a labeled slider inside the controls panel
 function addSlider(labelText, min, max, val, step, onChange) {
   let label = createDiv(labelText);
   label.parent(controlsDiv);
@@ -293,21 +333,20 @@ function addSlider(labelText, min, max, val, step, onChange) {
   return slider;
 }
 
-//places the panel beside the art on wide screens, below it on narrow ones
-function positionControls() {
-  //panel width (160) + padding (32) + 20px gap from art
-  const PANEL_TOTAL_W = 220;
-  let hasSideRoom = (artX + artW + PANEL_TOTAL_W) <= windowWidth;
-
-  if (hasSideRoom) {
-    controlsDiv.position(artX + artW + 20, artY);
+//positions the panel — left of art on wide layouts, below art on narrow
+function positionControls(wideLayout) {
+  if (wideLayout) {
+    //panel on the left, aligned with the buttons at the top of the art column
+    let panelX = artX - COL_GAP - PANEL_W;
+    let panelY = artY - BTN_H - 20; //align top with buttons
+    controlsDiv.position(panelX, panelY);
   } else {
-    let panelX = max(10, floor((width - 192) / 2));
-    controlsDiv.position(panelX, artY + artH + 20);
+    //below the art, horizontally centered
+    let panelX = max(10, floor((width - PANEL_W) / 2));
+    controlsDiv.position(panelX, artY + artH + 30);
   }
 }
 
-//debounced regen: wait 150ms after the last slider change before redrawing
 function scheduleRegen() {
   if (regenTimer) clearTimeout(regenTimer);
   regenTimer = setTimeout(() => {
@@ -333,7 +372,6 @@ function resetToSplash() {
   drawSplash();
 }
 
-//brightness (0-255) to ascii character
 function getAsciiChar(brightness) {
   let chars = rampDetail === 1 ? RAMP_LONG : RAMP_SHORT;
   return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
