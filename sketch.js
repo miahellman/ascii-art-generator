@@ -44,10 +44,11 @@ const RAMPS = {
   'minimal':  " .:-=+*#%@",
   'letters':  " .lcvonxserwmkhpdbqgKZSXAVUOQNHMW@",
   'symbols':  ' .,:;!?"\'`-_=+~*<>()[]{}|/\\&#%@$',
-  'blocks':   " ░▒▓█",
-  'dots':     " ··••●⬤",
+  'blocks':   " ▁▂▃▄▅▆▇█",
+  'dots':     " .·°oO@",
   'numbers':  " 1234567890",
   'binary':   " .01",
+  'braille': " ⣀⣄⣤⣦⣶⣷⣿",
 };
 
 //TWEAK: starting ramp style
