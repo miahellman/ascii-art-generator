@@ -36,26 +36,31 @@ function setup() {
 }
 
 //styles a button with hover swap
-//uses setProperty so p5's positioning isn't wiped
+//uses setProperty with !important so font-family etc beat browser defaults
 function styleButton(btn) {
   const base = {
-    'background': '#000', 'color': '#fff',
-    'border': '1px solid #000', 'border-radius': '0',
-    'padding': '8px 16px', 'width': BTN_W + 'px',
-    'font-family': 'Helvetica', 'font-size': '14px',
-    'cursor': 'pointer', 'box-sizing': 'border-box',
+    'background': '#000',
+    'color': '#fff',
+    'border': '2px solid #000',
+    'border-radius': '0',
+    'padding': '8px 16px',
+    'width': BTN_W + 'px',
+    'font-family': 'Helvetica, Arial, sans-serif',
+    'font-size': '14px',
+    'cursor': 'pointer',
+    'box-sizing': 'border-box',
   };
-  for (let [k, v] of Object.entries(base)) {
-    btn.elt.style.setProperty(k, v, 'important');
+
+  //helper applies all base styles plus any overrides
+  function apply(overrides = {}) {
+    for (let [k, v] of Object.entries({ ...base, ...overrides })) {
+      btn.elt.style.setProperty(k, v, 'important');
+    }
   }
-  btn.elt.addEventListener('mouseenter', () => {
-    btn.elt.style.setProperty('background', '#fff', 'important');
-    btn.elt.style.setProperty('color', '#000', 'important');
-  });
-  btn.elt.addEventListener('mouseleave', () => {
-    btn.elt.style.setProperty('background', '#000', 'important');
-    btn.elt.style.setProperty('color', '#fff', 'important');
-  });
+
+  apply();
+  btn.elt.addEventListener('mouseenter', () => apply({ background: '#fff', color: '#000' }));
+  btn.elt.addEventListener('mouseleave', () => apply());
 }
 
 //splash: title, button, instruction below
