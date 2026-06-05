@@ -316,7 +316,7 @@ function buildControls() {
   controlsDiv.style('font-family', 'JetBrains Mono');
   controlsDiv.style('font-size', '12px');
   controlsDiv.style('width', PANEL_W - 32 + 'px');
-  controlsDiv.style('border', '2px solid #000');
+  controlsDiv.style('border', '0.5px solid #000');
   controlsDiv.style('box-sizing', 'content-box');
   controlsDiv.style('z-index', '1000');
 
@@ -324,18 +324,17 @@ function buildControls() {
   let heading = createDiv('image settings');
   heading.parent(controlsDiv);
   heading.style('font-size', '14px');
-  heading.style('font-weight', 'bold');
-  heading.style('text-transform', 'uppercase');
+  heading.style('text-transform', 'lowercase');
   heading.style('letter-spacing', '1px');
   heading.style('margin-bottom', '12px');
   heading.style('padding-bottom', '8px');
-  heading.style('border-bottom', '1px solid #fff');
+  heading.style('border-bottom', '0.5px solid #fff');
 
   cellSizeSlider = addSlider('cell size', 3, 10, cellSize, 1, v => {
     cellSize = v;
     scheduleRegen();
   });
-  contrastSlider = addSlider('contrast', 0.5, 4, contrast, 0.1, v => {
+  contrastSlider = addSlider('contrast', 0.5, 6, contrast, 0.1, v => {
     contrast = v;
     scheduleRegen();
   });
