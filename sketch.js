@@ -40,20 +40,20 @@ let contrast = 1.4;
 //TWEAK: ramp styles — feel free to add your own, key shows in the dropdown
 //ramps go from lightest (left, sparse) to darkest (right, dense)
 const RAMPS = {
-  'classic':  " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
-  'minimal':  " .:-=+*#%@",
-  'letters':  " .lcvonxserwmkhpdbqgKZSXAVUOQNHMW@",
-  'symbols':  ' .,:;!?"\'`-_=+~*<>()[]{}|/\\&#%@$',
-  'blocks':   " ░▒▓█",
-  'dots':     " ··••●⬤",
-  'numbers':  " 1234567890",
-  'binary':   " .01",
+  'classic':  "   .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  'minimal':  "   .:-=+*#%@",
+  'letters':  "   .lcvonxserwmkhpdbqgKZSXAVUOQNHMW@",
+  'symbols':  '   .,:;!?"\'`-_=+~*<>()[]{}|/\\&#%@$',
+  'blocks':   "   ░▒▓█",
+  'dots':     "   ··••●⬤",
+  'numbers':  "   1234567890",
+  'binary':   "   .01",
 };
 
-//TWEAK: starting ramp style — must match a key in RAMPS
+//TWEAK: starting ramp style
 let rampStyle = 'classic';
 
-//TWEAK: splash subtitle messages — one is randomly picked on each visit to splash
+//TWEAK: random splash subtitle messages
 const SPLASH_MESSAGES = [
   '^ just do it',
   '^ you aren\'t curious to see what will happen?',
@@ -65,7 +65,6 @@ const SPLASH_MESSAGES = [
   '^ it will bring you joy',
 ];
 
-//holds the message chosen for the current splash view
 let currentSplashMessage = '';
 
 let artX = 0, artY = 0, artW = 0, artH = 0;
@@ -74,7 +73,6 @@ function isNarrow() {
   return windowWidth < PANEL_W + PANEL_MARGIN * 2 + MAX_ART_SIZE + 40;
 }
 
-//picks a random splash message
 function pickSplashMessage() {
   currentSplashMessage = SPLASH_MESSAGES[floor(random(SPLASH_MESSAGES.length))];
 }
@@ -127,6 +125,8 @@ function setup() {
       cursor: pointer;
       outline: none;
       box-sizing: border-box;
+      -webkit-appearance: none;
+      appearance: none;
     }
     select.ascii-select:hover {
       background: #000;
@@ -142,7 +142,6 @@ function setup() {
   styleButton(uploadButton);
   uploadButton.mousePressed(() => input.elt.click());
 
-  //pick the initial splash message
   pickSplashMessage();
   drawSplash();
 }
@@ -184,7 +183,6 @@ function drawSplash() {
   uploadButton.show();
   uploadButton.position(width / 2 - BTN_W / 2, height / 2);
 
-  //random subtitle message
   textSize(12);
   text(currentSplashMessage, width / 2, height / 2 + BTN_H + 25);
 }
@@ -216,7 +214,6 @@ function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  //scale image to fit within MAX_ART_SIZE x MAX_ART_SIZE
   let imgAspect = img.height / img.width;
   let targetW, targetH;
   if (imgAspect > 1) {
@@ -230,7 +227,7 @@ function processImage() {
   artH = floor(targetH / cellSize) * cellSize;
 
   let canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
-  if (isNarrow()) canvasH += 280;
+  if (isNarrow()) canvasH += 320;
 
   resizeCanvas(windowWidth, canvasH);
   background(255);
@@ -243,11 +240,9 @@ function processImage() {
   }
   artY = TOP_PAD + BTN_H + 20;
 
-  //work on a copy so img stays pristine for resizes
   let work = img.get();
   work.resize(artW / cellSize, artH / cellSize);
 
-  //apply contrast boost
   work.loadPixels();
   for (let i = 0; i < work.pixels.length; i += 4) {
     for (let j = 0; j < 3; j++) {
@@ -292,7 +287,7 @@ function draw() {
 function showButtons() {
   buttonsShown = true;
 
-  saveButton = createButton('save png');
+  saveButton = createButton('save image');
   styleButton(saveButton);
   saveButton.position(artX, artY - BTN_H - 20);
   saveButton.mousePressed(() => saveCanvas('ascii-art', 'png'));
@@ -320,6 +315,17 @@ function buildControls() {
   controlsDiv.style('box-sizing', 'content-box');
   controlsDiv.style('z-index', '1000');
 
+  //heading at the top of the panel
+  let heading = createDiv('image settings');
+  heading.parent(controlsDiv);
+  heading.style('font-size', '14px');
+  heading.style('font-weight', 'bold');
+  heading.style('text-transform', 'uppercase');
+  heading.style('letter-spacing', '1px');
+  heading.style('margin-bottom', '12px');
+  heading.style('padding-bottom', '8px');
+  heading.style('border-bottom', '1px solid #fff');
+
   cellSizeSlider = addSlider('cell size', 3, 10, cellSize, 1, v => {
     cellSize = v;
     scheduleRegen();
@@ -328,7 +334,7 @@ function buildControls() {
     contrast = v;
     scheduleRegen();
   });
-  //style picker — pulls options from the RAMPS object keys
+  //style picker — built with direct DOM for reliability
   addDropdown('style', Object.keys(RAMPS), rampStyle, v => {
     rampStyle = v;
     scheduleRegen();
@@ -348,20 +354,26 @@ function addSlider(labelText, min, max, val, step, onChange) {
   return slider;
 }
 
-//creates a labeled dropdown inside the controls panel
+//creates a labeled dropdown using direct DOM (more reliable than createSelect)
 function addDropdown(labelText, options, initialValue, onChange) {
   let label = createDiv(labelText);
   label.parent(controlsDiv);
   label.style('margin-top', '8px');
   label.style('margin-bottom', '4px');
 
-  let sel = createSelect();
-  sel.parent(controlsDiv);
-  sel.addClass('ascii-select');
-  for (let opt of options) sel.option(opt);
-  sel.selected(initialValue);
-  sel.changed(() => onChange(sel.value()));
-  return sel;
+  //build native select element directly
+  let select = document.createElement('select');
+  select.className = 'ascii-select';
+  for (let opt of options) {
+    let option = document.createElement('option');
+    option.value = opt;
+    option.textContent = opt;
+    if (opt === initialValue) option.selected = true;
+    select.appendChild(option);
+  }
+  select.addEventListener('change', () => onChange(select.value));
+  controlsDiv.elt.appendChild(select);
+  return select;
 }
 
 function positionControls() {
@@ -397,7 +409,6 @@ function resetToSplash() {
   if (controlsDiv) controlsDiv.hide();
   input.elt.value = '';
 
-  //roll a new random message for the splash
   pickSplashMessage();
 
   resizeCanvas(windowWidth, windowHeight);
