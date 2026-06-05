@@ -324,7 +324,6 @@ function buildControls() {
   let heading = createDiv('image settings');
   heading.parent(controlsDiv);
   heading.style('font-size', '14px');
-  heading.style('text-transform', 'lowercase');
   heading.style('letter-spacing', '1px');
   heading.style('margin-bottom', '12px');
   heading.style('padding-bottom', '8px');
