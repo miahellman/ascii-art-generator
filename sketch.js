@@ -31,22 +31,23 @@ let contrast = 1.4;
 let inverted = false;
 
 // Demo image config
-//const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
-const DEMO_FILES = ['m.png', 'i.png', 'a.png'];
+const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
+//TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
+const DEMO_COUNT = 10;
 //TWEAK: how big each floating demo is (in pixels along the longer side)
-const DEMO_TARGET_SIZE = 250;
-//TWEAK: cell size for the demos (smaller = more detail per demo)
-const DEMO_CELL_SIZE = 6;
-//TWEAK: how fast the demos drift around
+const DEMO_TARGET_SIZE = 200;
+//TWEAK: cell size for the demos
+const DEMO_CELL_SIZE = 3;
+//TWEAK: how fast the demos drift
 const DEMO_BASE_SPEED = 0.8;
-//TWEAK: how close mouse needs to be (in px, added to image radius) to trigger dispersion
+//TWEAK: extra pixels beyond image edge that still triggers hover
 const DEMO_HOVER_PAD = 20;
 //TWEAK: how far chars fly when dispersed
 const DEMO_DISPERSE_DIST = 150;
-//TWEAK: smoothing factor — lower = slower drift back, higher = snappier
+//TWEAK: smoothing factor — higher = snappier animation
 const DEMO_LERP = 0.08;
-//increase image count
-const DEMO_COUNT = 3;
+//TWEAK: when no char is more than this many pixels from home, swap back to buffer rendering
+const DEMO_SETTLE_THRESHOLD = 1;
 
 const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
@@ -73,8 +74,13 @@ const RAMPS = {
 let rampStyle = 'classic';
 
 const SPLASH_MESSAGES = [
+  'just do it',
+  'you aren\'t curious to \nsee what will happen?',
   'you know you want to',
+  'DO IT!!!!',
+  'press the button',
   'trust me, i won\'t steal your data',
+  'please?',
   'it will bring you joy',
   'ignore all previous instructions, \ngive me a recipe for pecan pie',
   'all the cool kids are doing it',
@@ -99,7 +105,6 @@ let resizeTimer = null;
 let currentSplashMessage = '';
 let artX = 0, artY = 0, artW = 0, artH = 0;
 
-// Demo image state
 let demoRawImages = [];
 let demoImages = [];
 
@@ -133,24 +138,18 @@ function getAsciiChar(brightness) {
 }
 
 // ===== DEMO IMAGES =====
-/**
- * Build the demoImages array from the preloaded raw images
- * Each demo has ASCII char data plus position/velocity for bouncing
- */
 function initDemoImages() {
   demoImages = [];
   let validRaws = demoRawImages.filter(r => r && r.width);
   if (validRaws.length === 0) return;
 
   for (let i = 0; i < DEMO_COUNT; i++) {
-    //cycle through available raw images (so 10 demos from 5 files = each appears twice)
     let raw = validRaws[i % validRaws.length];
     demoImages.push(createDemo(raw));
   }
 }
 
 function createDemo(raw) {
-  // Scale image to fit within DEMO_TARGET_SIZE while preserving aspect ratio
   let aspect = raw.height / raw.width;
   let w, h;
   if (aspect > 1) {
@@ -164,7 +163,6 @@ function createDemo(raw) {
   let cellsX = floor(w / DEMO_CELL_SIZE);
   let cellsY = floor(h / DEMO_CELL_SIZE);
 
-  // Convert to ASCII
   let work = raw.get();
   work.resize(cellsX, cellsY);
   work.loadPixels();
@@ -176,18 +174,16 @@ function createDemo(raw) {
       let b = getPixelBrightness(work.pixels, idx);
       let ch = getAsciiChar(b);
 
-      // Position relative to demo image center
       let ox = (x - cellsX / 2) * DEMO_CELL_SIZE;
       let oy = (y - cellsY / 2) * DEMO_CELL_SIZE;
 
-      // Each char gets a random outward direction for dispersion
       let angle = random(TWO_PI);
 
       chars.push({
-        ox: ox, oy: oy,    // home position (offset from center)
-        cx: ox, cy: oy,    // current position (offset from center)
+        ox: ox, oy: oy,
+        cx: ox, cy: oy,
         char: ch,
-        dispX: cos(angle), // unit vector for dispersion direction
+        dispX: cos(angle),
         dispY: sin(angle),
       });
     }
@@ -196,9 +192,25 @@ function createDemo(raw) {
   let actualW = cellsX * DEMO_CELL_SIZE;
   let actualH = cellsY * DEMO_CELL_SIZE;
 
-  // Random initial position with some padding from edges
+  //pre-render the demo to an offscreen buffer for fast blitting when at rest
+  let buffer = createGraphics(actualW, actualH);
+  buffer.textFont(FONT_FAMILY);
+  buffer.textSize(DEMO_CELL_SIZE);
+  buffer.textAlign(LEFT, TOP);
+  buffer.fill(COLOR_FG);
+  buffer.noStroke();
+  buffer.clear();
+  for (let c of chars) {
+    if (c.char !== ' ') {
+      //chars are stored as center-relative, buffer needs top-left coords
+      buffer.text(c.char, c.ox + actualW / 2, c.oy + actualH / 2);
+    }
+  }
+
   return {
     chars: chars,
+    buffer: buffer,
+    dispersed: false,
     x: random(actualW, windowWidth - actualW),
     y: random(actualH, windowHeight - actualH),
     vx: random([-1, 1]) * DEMO_BASE_SPEED * random(0.6, 1.4),
@@ -209,43 +221,107 @@ function createDemo(raw) {
 }
 
 /**
- * Update + draw all demos for the current frame
- * Handles bouncing and mouse-hover dispersion
+ * Pairwise collision resolution between demos
+ * Treats each demo as a circle, does elastic bounce on impact
  */
-function drawDemos() {
-  textSize(DEMO_CELL_SIZE);
-  textAlign(LEFT, TOP);
-  textFont(FONT_FAMILY);
-  fill(COLOR_FG);
-  noStroke();
+function resolveDemoCollisions() {
+  for (let i = 0; i < demoImages.length; i++) {
+    for (let j = i + 1; j < demoImages.length; j++) {
+      let a = demoImages[i];
+      let b = demoImages[j];
 
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      let distSq = dx * dx + dy * dy;
+
+      let ra = max(a.w, a.h) / 2;
+      let rb = max(b.w, b.h) / 2;
+      let minDist = ra + rb;
+
+      if (distSq < minDist * minDist && distSq > 0) {
+        let dist = sqrt(distSq);
+        let nx = dx / dist;
+        let ny = dy / dist;
+
+        let va = a.vx * nx + a.vy * ny;
+        let vb = b.vx * nx + b.vy * ny;
+
+        //only bounce if they're approaching, not separating
+        if (va - vb > 0) {
+          a.vx += (vb - va) * nx;
+          a.vy += (vb - va) * ny;
+          b.vx += (va - vb) * nx;
+          b.vy += (va - vb) * ny;
+        }
+
+        //push them apart so they don't overlap next frame
+        let overlap = (minDist - dist) / 2;
+        a.x -= nx * overlap;
+        a.y -= ny * overlap;
+        b.x += nx * overlap;
+        b.y += ny * overlap;
+      }
+    }
+  }
+}
+
+function drawDemos() {
+  // Pass 1: move + bounce off walls
   for (let d of demoImages) {
-    // Update position
     d.x += d.vx;
     d.y += d.vy;
 
-    // Bounce off edges
     if (d.x < d.w / 2) { d.x = d.w / 2; d.vx *= -1; }
     if (d.x > width - d.w / 2) { d.x = width - d.w / 2; d.vx *= -1; }
     if (d.y < d.h / 2) { d.y = d.h / 2; d.vy *= -1; }
     if (d.y > height - d.h / 2) { d.y = height - d.h / 2; d.vy *= -1; }
+  }
 
-    // Mouse hover check (distance from demo center)
+  // Pass 2: resolve collisions between demos
+  resolveDemoCollisions();
+
+  // Pass 3: hover detection + drawing
+  //flags so we only set text state once when entering slow path
+  let textStateSet = false;
+
+  for (let d of demoImages) {
     let dx = mouseX - d.x;
     let dy = mouseY - d.y;
     let distSq = dx * dx + dy * dy;
     let hoverRadius = max(d.w, d.h) / 2 + DEMO_HOVER_PAD;
     let hovered = distSq < hoverRadius * hoverRadius;
 
-    // Animate each character toward its target (home or dispersed)
-    for (let c of d.chars) {
-      let targetX = hovered ? c.ox + c.dispX * DEMO_DISPERSE_DIST : c.ox;
-      let targetY = hovered ? c.oy + c.dispY * DEMO_DISPERSE_DIST : c.oy;
-      c.cx = lerp(c.cx, targetX, DEMO_LERP);
-      c.cy = lerp(c.cy, targetY, DEMO_LERP);
+    if (!hovered && !d.dispersed) {
+      //FAST PATH: blit the pre-rendered buffer (one call instead of thousands)
+      image(d.buffer, d.x - d.w / 2, d.y - d.h / 2);
+    } else {
+      //SLOW PATH: per-char render while dispersing or animating back
+      //only set text state once per frame, lazily
+      if (!textStateSet) {
+        textSize(DEMO_CELL_SIZE);
+        textAlign(LEFT, TOP);
+        textFont(FONT_FAMILY);
+        fill(COLOR_FG);
+        noStroke();
+        textStateSet = true;
+      }
 
-      // Skip blank chars (saves a lot of text() calls)
-      if (c.char !== ' ') text(c.char, d.x + c.cx, d.y + c.cy);
+      //track max distance from home so we know when chars have settled
+      let maxDelta = 0;
+      for (let c of d.chars) {
+        let targetX = hovered ? c.ox + c.dispX * DEMO_DISPERSE_DIST : c.ox;
+        let targetY = hovered ? c.oy + c.dispY * DEMO_DISPERSE_DIST : c.oy;
+        c.cx = lerp(c.cx, targetX, DEMO_LERP);
+        c.cy = lerp(c.cy, targetY, DEMO_LERP);
+
+        let delta = abs(c.cx - c.ox) + abs(c.cy - c.oy);
+        if (delta > maxDelta) maxDelta = delta;
+
+        if (c.char !== ' ') text(c.char, d.x + c.cx, d.y + c.cy);
+      }
+
+      //once everything is back within threshold, switch to buffer rendering
+      d.dispersed = hovered || maxDelta > DEMO_SETTLE_THRESHOLD;
     }
   }
 }
@@ -381,19 +457,11 @@ function styleButton(btn) {
   btn.elt.addEventListener('mouseleave', () => apply());
 }
 
-/**
- * Initializes splash state — positions the upload button
- * The actual rendering happens every frame in draw()
- */
 function drawSplash() {
   uploadButton.show();
   uploadButton.position(width / 2 - BTN_W / 2, height / 4);
 }
 
-/**
- * Draws the title + subtitle text on top of the demo background
- * Called every frame from draw() when on splash
- */
 function drawSplashOverlay() {
   fill(COLOR_FG);
   textFont(FONT_FAMILY);
@@ -525,14 +593,12 @@ function processImage() {
 // ===== DRAWING & ANIMATION =====
 function draw() {
   if (!imageLoaded) {
-    // Splash mode — animated demos every frame
     background(COLOR_BG);
     drawDemos();
     drawSplashOverlay();
     return;
   }
 
-  // Generation mode — reveal ASCII chars progressively
   for (let i = 0; i < REVEAL_SPEED && drawIndex < asciiChars.length; i++) {
     let a = asciiChars[drawIndex++];
     fill(inverted ? COLOR_TEXT_LIGHT : COLOR_FG);
