@@ -4,7 +4,6 @@ let asciiChars = [];
 let drawIndex = 0;
 
 //TWEAK: lower = more detail, higher = chunkier
-//range: 3 (very detailed, slower) to 8 (chunky, fast)
 let cellSize = 4;
 
 let imageLoaded = false;
@@ -14,12 +13,8 @@ let uploadButton;
 let newFileButton;
 let saveButton;
 let buttonsShown = false;
-
-//tracks whether the user has generated an image at least once
-//used to swap the splash title from "mia hellman" to "ascii art generator"
 let hasGeneratedOnce = false;
 
-//slider controls
 let controlsDiv;
 let cellSizeSlider;
 let contrastSlider;
@@ -29,38 +24,37 @@ let regenTimer = null;
 const BTN_W = 140;
 const BTN_H = 36;
 
-//TWEAK: max width AND height the art can be — image scales down to fit inside this box
+//TWEAK: max width AND height the art can be
 const MAX_ART_SIZE = 550;
 
-//panel total width including padding + border, used for layout math
-const PANEL_W = 192;
-//gap between panel and art on wide screens
-const COL_GAP = 30;
+//panel sizing
+const PANEL_W = 200;
+const PANEL_MARGIN = 20;
 
 const TOP_PAD = 80;
-const BOTTOM_PAD = 40;
+const BOTTOM_PAD = 60;
 
-//TWEAK: how many characters get revealed per frame
 const REVEAL_SPEED = 500;
 
-//TWEAK: starting contrast — sliders override this once visible
 let contrast = 1.4;
-
-//TWEAK: starting ramp length — 0 = short chunky, 1 = long detailed
 let rampDetail = 1;
 
 const RAMP_SHORT = " .:-=+*#%@";
 const RAMP_LONG = " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
 
-//art bounds within the canvas
 let artX = 0, artY = 0, artW = 0, artH = 0;
+
+//detects narrow screens — panel stacks above art instead of sitting beside it
+function isNarrow() {
+  return windowWidth < PANEL_W + PANEL_MARGIN * 2 + MAX_ART_SIZE + 40;
+}
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   background(255);
   textFont('Helvetica');
 
-  //inject css for the range sliders so they match the button style
+  //inject slider styles directly to head
   let styleTag = document.createElement('style');
   styleTag.textContent = `
     input[type=range].ascii-slider {
@@ -104,7 +98,6 @@ function setup() {
   drawSplash();
 }
 
-//styles a button with hover swap
 function styleButton(btn) {
   const base = {
     'background': '#000',
@@ -130,7 +123,6 @@ function styleButton(btn) {
   btn.elt.addEventListener('mouseleave', () => apply());
 }
 
-//splash screen
 function drawSplash() {
   background(255);
   fill(0);
@@ -170,60 +162,40 @@ function handleFile(file) {
   buttonsShown = false;
 }
 
-//converts image into ascii character grid
 function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  //scale image to fit within MAX_ART_SIZE x MAX_ART_SIZE, preserving aspect ratio
+  //scale image to fit within MAX_ART_SIZE x MAX_ART_SIZE
   let imgAspect = img.height / img.width;
   let targetW, targetH;
   if (imgAspect > 1) {
-    //taller than wide: height is the constraint
     targetH = MAX_ART_SIZE;
     targetW = MAX_ART_SIZE / imgAspect;
   } else {
-    //wider than tall: width is the constraint
     targetW = MAX_ART_SIZE;
     targetH = MAX_ART_SIZE * imgAspect;
   }
-  //round to multiples of cellSize for a clean grid
   artW = floor(targetW / cellSize) * cellSize;
   artH = floor(targetH / cellSize) * cellSize;
 
-  //decide layout based on available width
-  //wide: panel + gap + art fits in window
-  //narrow: stack panel below art
-  let wideLayout = (PANEL_W + COL_GAP + artW + 40) <= windowWidth;
-
-  //compute canvas height based on layout
-  let canvasH;
-  if (wideLayout) {
-    //tallest column wins (art column includes buttons above it)
-    let artColH = BTN_H + 20 + artH;
-    let panelColH = 220; //approximate panel height — adjust if you add more sliders
-    canvasH = TOP_PAD + max(artColH, panelColH) + BOTTOM_PAD;
-  } else {
-    //stacked: buttons + art + gap + panel
-    canvasH = TOP_PAD + BTN_H + 20 + artH + 30 + 220 + BOTTOM_PAD;
-  }
-  canvasH = max(windowHeight, canvasH);
+  //canvas size: tall enough for buttons + art + padding
+  let canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
+  //on narrow layouts, reserve space below for the panel
+  if (isNarrow()) canvasH += 240;
 
   resizeCanvas(windowWidth, canvasH);
   background(255);
 
-  //position the art column
-  if (wideLayout) {
-    //panel on left, art on right — center the combined block
-    let totalW = PANEL_W + COL_GAP + artW;
-    let blockX = floor((width - totalW) / 2);
-    artX = blockX + PANEL_W + COL_GAP;
-    artY = TOP_PAD + BTN_H + 20; //leave room for buttons above
-  } else {
-    //art centered, full width if it fits
+  //position art: on wide screens, centered in the area to the right of the panel
+  //on narrow screens, centered in the full window
+  if (isNarrow()) {
     artX = floor((width - artW) / 2);
-    artY = TOP_PAD + BTN_H + 20;
+  } else {
+    let rightAreaStart = PANEL_W + PANEL_MARGIN * 2;
+    artX = rightAreaStart + floor((width - rightAreaStart - artW) / 2);
   }
+  artY = TOP_PAD + BTN_H + 20;
 
   //work on a copy so img stays pristine for resizes
   let work = img.get();
@@ -256,7 +228,7 @@ function processImage() {
   textAlign(LEFT, TOP);
   textSize(cellSize);
 
-  if (controlsDiv) positionControls(wideLayout);
+  if (controlsDiv) positionControls();
 }
 
 function draw() {
@@ -274,7 +246,6 @@ function draw() {
 function showButtons() {
   buttonsShown = true;
 
-  //save in top-left of art, upload-new in top-right
   saveButton = createButton('save image');
   styleButton(saveButton);
   saveButton.position(artX, artY - BTN_H - 20);
@@ -287,23 +258,21 @@ function showButtons() {
 
   if (!controlsDiv) buildControls();
   controlsDiv.show();
-  //figure out current layout for positioning
-  let wideLayout = (PANEL_W + COL_GAP + artW + 40) <= windowWidth;
-  positionControls(wideLayout);
+  positionControls();
 }
 
-//creates the slider panel — runs once
 function buildControls() {
   controlsDiv = createDiv();
-  controlsDiv.style('position', 'absolute');
+  //fixed position so it stays put on scroll, like the reference site
+  controlsDiv.style('position', 'fixed');
   controlsDiv.style('background', '#000');
   controlsDiv.style('color', '#fff');
   controlsDiv.style('padding', '16px');
   controlsDiv.style('font-family', 'Helvetica, Arial, sans-serif');
   controlsDiv.style('font-size', '12px');
-  controlsDiv.style('width', '160px');
+  controlsDiv.style('width', PANEL_W - 32 + 'px');
   controlsDiv.style('border', '2px solid #000');
-  controlsDiv.style('box-sizing', 'border-box');
+  controlsDiv.style('box-sizing', 'content-box');
   controlsDiv.style('z-index', '1000');
 
   cellSizeSlider = addSlider('cell size', 3, 10, cellSize, 1, v => {
@@ -333,17 +302,20 @@ function addSlider(labelText, min, max, val, step, onChange) {
   return slider;
 }
 
-//positions the panel — left of art on wide layouts, below art on narrow
-function positionControls(wideLayout) {
-  if (wideLayout) {
-    //panel on the left, aligned with the buttons at the top of the art column
-    let panelX = artX - COL_GAP - PANEL_W;
-    let panelY = artY - BTN_H - 20; //align top with buttons
-    controlsDiv.position(panelX, panelY);
-  } else {
-    //below the art, horizontally centered
+//positions the fixed panel
+//wide: top-left of viewport
+//narrow: switches to absolute and goes below the art
+function positionControls() {
+  if (isNarrow()) {
+    //switch to absolute so it scrolls with content, positioned below art
+    controlsDiv.style('position', 'absolute');
     let panelX = max(10, floor((width - PANEL_W) / 2));
     controlsDiv.position(panelX, artY + artH + 30);
+  } else {
+    //fixed to top-left of viewport, always visible
+    controlsDiv.style('position', 'fixed');
+    controlsDiv.elt.style.left = PANEL_MARGIN + 'px';
+    controlsDiv.elt.style.top = PANEL_MARGIN + 'px';
   }
 }
 
