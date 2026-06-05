@@ -37,7 +37,7 @@ const DEMO_FILES = ['images/1.jpg', 'images/2.png', 'images/3.jpg', 'images/4.jp
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 8;
 //TWEAK: how big each floating demo is
-const DEMO_TARGET_SIZE = 250;
+const DEMO_TARGET_SIZE = 200;
 //TWEAK: cell size for the demos
 const DEMO_CELL_SIZE = 7;
 //TWEAK: how fast the demos drift
@@ -45,7 +45,7 @@ const DEMO_BASE_SPEED = 0.8;
 //TWEAK: extra pixels beyond image edge that still triggers hover
 const DEMO_HOVER_PAD = 20;
 //TWEAK: how far chars fly when dispersed
-const DEMO_DISPERSE_DIST = 100;
+const DEMO_DISPERSE_DIST = 75;
 //TWEAK: smoothing factor — higher = snappier animation
 const DEMO_LERP = 0.1;
 //TWEAK: settle threshold for swapping back to buffer rendering
