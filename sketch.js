@@ -44,6 +44,8 @@ const DEMO_HOVER_PAD = 20;
 const DEMO_DISPERSE_DIST = 150;
 //TWEAK: smoothing factor — lower = slower drift back, higher = snappier
 const DEMO_LERP = 0.08;
+//increase image count
+const DEMO_COUNT = 10;
 
 const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
@@ -136,8 +138,12 @@ function getAsciiChar(brightness) {
  */
 function initDemoImages() {
   demoImages = [];
-  for (let raw of demoRawImages) {
-    if (!raw || !raw.width) continue;
+  let validRaws = demoRawImages.filter(r => r && r.width);
+  if (validRaws.length === 0) return;
+
+  for (let i = 0; i < DEMO_COUNT; i++) {
+    //cycle through available raw images (so 10 demos from 5 files = each appears twice)
+    let raw = validRaws[i % validRaws.length];
     demoImages.push(createDemo(raw));
   }
 }
