@@ -255,13 +255,13 @@ function drawSplash() {
 
   let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : '';
   textSize(FONT_SIZE_TITLE);
-  text(title, width / 2, height / 2 - 40);
+  text(title, width / 2, height / 4 - 40);
 
   uploadButton.show();
-  uploadButton.position(width / 2 - BTN_W / 2, height / 2);
+  uploadButton.position(width / 2 - BTN_W / 2, height / 4);
 
   textSize(FONT_SIZE_SPLASH);
-  text(currentSplashMessage, width / 2, height / 2 + BTN_H + 25);
+  text(currentSplashMessage, width / 2, height / 4 + BTN_H + 25);
 }
 
 // ===== FILE HANDLING =====
