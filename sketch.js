@@ -24,7 +24,7 @@ const BTN_W = 140;
 const BTN_H = 36;
 
 //TWEAK: max width AND height the art can be
-const MAX_ART_SIZE = 550;
+const MAX_ART_SIZE = 800;
 
 const PANEL_W = 200;
 const PANEL_MARGIN = 20;
