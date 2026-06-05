@@ -295,7 +295,10 @@ function showButtons() {
   saveButton = createButton('save image');
   styleButton(saveButton);
   saveButton.position(artX, artY - BTN_H - 20);
-  saveButton.mousePressed(() => saveCanvas('ascii-art', 'png'));
+  saveButton.mousePressed(() => {
+  let cropped = get(artX, artY, artW, artH);
+  cropped.save('ascii-art', 'png');
+});
 
   newFileButton = createButton('upload new');
   styleButton(newFileButton);
