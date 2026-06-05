@@ -37,7 +37,7 @@ const DEMO_FILES = ['images/1.jpg', 'images/2.png', 'images/3.jpg', 'images/4.jp
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 8;
 //TWEAK: how big each floating demo is
-const DEMO_TARGET_SIZE = 300;
+const DEMO_TARGET_SIZE = 250;
 //TWEAK: cell size for the demos
 const DEMO_CELL_SIZE = 7;
 //TWEAK: how fast the demos drift
