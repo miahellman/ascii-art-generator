@@ -33,7 +33,7 @@ let inverted = false;
 // Demo image config
 const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
 //TWEAK: how big each floating demo is (in pixels along the longer side)
-const DEMO_TARGET_SIZE = 300;
+const DEMO_TARGET_SIZE = 200;
 //TWEAK: cell size for the demos (smaller = more detail per demo)
 const DEMO_CELL_SIZE = 6;
 //TWEAK: how fast the demos drift around
@@ -45,7 +45,7 @@ const DEMO_DISPERSE_DIST = 150;
 //TWEAK: smoothing factor — lower = slower drift back, higher = snappier
 const DEMO_LERP = 0.08;
 //increase image count
-const DEMO_COUNT = 10;
+const DEMO_COUNT = 8;
 
 const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
