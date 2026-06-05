@@ -39,17 +39,17 @@ const DEMO_COUNT = 10;
 //TWEAK: how big each floating demo is
 const DEMO_TARGET_SIZE = 200;
 //TWEAK: cell size for the demos
-const DEMO_CELL_SIZE = 4;
+const DEMO_CELL_SIZE = 5;
 //TWEAK: how fast the demos drift
 const DEMO_BASE_SPEED = 0.8;
 //TWEAK: extra pixels beyond image edge that still triggers hover
 const DEMO_HOVER_PAD = 20;
 //TWEAK: how far chars fly when dispersed
-const DEMO_DISPERSE_DIST = 150;
+const DEMO_DISPERSE_DIST = 100;
 //TWEAK: smoothing factor — higher = snappier animation
-const DEMO_LERP = 0.08;
+const DEMO_LERP = 0.1;
 //TWEAK: settle threshold for swapping back to buffer rendering
-const DEMO_SETTLE_THRESHOLD = 1;
+const DEMO_SETTLE_THRESHOLD = .75;
 //TWEAK: collision radius as a fraction of demo size — lower = more overlap before bouncing
 const COLLISION_RADIUS_SCALE = 0.75;
 
