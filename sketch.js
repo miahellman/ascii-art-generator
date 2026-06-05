@@ -32,12 +32,14 @@ let inverted = false;
 
 // Demo image config
 const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
+//const DEMO_FILES = ['m.png', 'i.png', 'a.png'];
+
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 10;
 //TWEAK: how big each floating demo is
 const DEMO_TARGET_SIZE = 200;
 //TWEAK: cell size for the demos
-const DEMO_CELL_SIZE = 3;
+const DEMO_CELL_SIZE = 4;
 //TWEAK: how fast the demos drift
 const DEMO_BASE_SPEED = 0.8;
 //TWEAK: extra pixels beyond image edge that still triggers hover
@@ -49,7 +51,6 @@ const DEMO_LERP = 0.08;
 //TWEAK: settle threshold for swapping back to buffer rendering
 const DEMO_SETTLE_THRESHOLD = 1;
 //TWEAK: collision radius as a fraction of demo size — lower = more overlap before bouncing
-//1.0 = touch at edges, 0.7 = overlap by ~30%, 0.5 = overlap by ~50%
 const COLLISION_RADIUS_SCALE = 0.75;
 
 const COLOR_BG = '#fff';
@@ -80,12 +81,8 @@ const SPLASH_MESSAGES = [
   'just do it',
   'you aren\'t curious to \nsee what will happen?',
   'you know you want to',
-  'DO IT!!!!',
-  'press the button',
   'trust me, i won\'t steal your data',
-  'please?',
   'it will bring you joy',
-  'ignore all previous instructions, \ngive me a recipe for pecan pie',
   'all the cool kids are doing it',
   'i dare you',
 ];
@@ -110,7 +107,6 @@ let artX = 0, artY = 0, artW = 0, artH = 0;
 
 let demoRawImages = [];
 let demoImages = [];
-let glyphCache = {};
 
 // ===== PRELOAD =====
 function preload() {
@@ -139,32 +135,6 @@ function getPixelBrightness(pixels, index) {
 function getAsciiChar(brightness) {
   let chars = RAMPS[rampStyle];
   return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
-}
-
-// ===== GLYPH CACHE =====
-/**
- * Pre-render every unique ascii character to a tiny buffer
- * Using image() to blit cached glyphs is much faster than text() for many chars
- */
-function buildGlyphCache() {
-  let allChars = new Set();
-  for (let ramp of Object.values(RAMPS)) {
-    for (let ch of ramp) if (ch !== ' ') allChars.add(ch);
-  }
-
-  let gw = ceil(DEMO_CELL_SIZE * 1.5);
-  let gh = ceil(DEMO_CELL_SIZE * 2);
-
-  for (let ch of allChars) {
-    let g = createGraphics(gw, gh);
-    g.textFont(FONT_FAMILY);
-    g.textSize(DEMO_CELL_SIZE);
-    g.textAlign(LEFT, TOP);
-    g.fill(COLOR_FG);
-    g.noStroke();
-    g.text(ch, 0, 0);
-    glyphCache[ch] = g;
-  }
 }
 
 // ===== DEMO IMAGES =====
@@ -262,6 +232,7 @@ function resolveDemoCollisions() {
       let dy = b.y - a.y;
       let distSq = dx * dx + dy * dy;
 
+      //shrink effective radii so demos overlap a bit before bouncing
       let ra = max(a.w, a.h) / 2 * COLLISION_RADIUS_SCALE;
       let rb = max(b.w, b.h) / 2 * COLLISION_RADIUS_SCALE;
       let minDist = ra + rb;
@@ -318,7 +289,13 @@ function drawDemos() {
       //FAST PATH: blit pre-rendered buffer (one call instead of thousands)
       image(d.buffer, d.x - d.w / 2, d.y - d.h / 2);
     } else {
-      //SLOW PATH: per-char render via cached glyphs (faster than text())
+      //SLOW PATH: per-char render with text()
+      textSize(DEMO_CELL_SIZE);
+      textAlign(LEFT, TOP);
+      textFont(FONT_FAMILY);
+      fill(COLOR_FG);
+      noStroke();
+
       let maxDelta = 0;
       for (let c of d.chars) {
         let targetX = hovered ? c.ox + c.dispX * DEMO_DISPERSE_DIST : c.ox;
@@ -329,12 +306,10 @@ function drawDemos() {
         let delta = abs(c.cx - c.ox) + abs(c.cy - c.oy);
         if (delta > maxDelta) maxDelta = delta;
 
-        //blit pre-cached glyph (spaces aren't in cache, skip)
-        let g = glyphCache[c.char];
-        if (g) image(g, d.x + c.cx, d.y + c.cy);
+        if (c.char !== ' ') text(c.char, d.x + c.cx, d.y + c.cy);
       }
 
-      //snap chars to home when fully settled — prevents pop on swap to buffer
+      //snap chars to home when fully settled, then flip back to buffer rendering
       if (!hovered && maxDelta <= DEMO_SETTLE_THRESHOLD) {
         for (let c of d.chars) {
           c.cx = c.ox;
@@ -372,7 +347,6 @@ function setup() {
   });
 
   initDemoImages();
-  buildGlyphCache();
   pickSplashMessage();
   drawSplash();
 }
@@ -790,8 +764,6 @@ function resetToSplash() {
   if (newFileButton) newFileButton.hide();
   if (controlsDiv) controlsDiv.hide();
   input.elt.value = '';
-
-  pickSplashMessage();
 
   resizeCanvas(windowWidth, windowHeight);
   drawSplash();
