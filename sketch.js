@@ -1,5 +1,4 @@
 //ascii image generator
-
 let img;
 let asciiChars = [];
 let drawIndex = 0;
@@ -14,22 +13,16 @@ let buttonsShown = false;
 
 const BTN_W = 140;
 const BTN_H = 36;
-//max width the art can grow to
 const MAX_ART_W = 800;
-//space at the top of the canvas for the buttons above the art
 const TOP_PAD = 80;
 const BOTTOM_PAD = 20;
 
-//art bounds
-let artX = 0;
-let artY = 0;
-let artW = 0;
-let artH = 0;
+//art bounds within the canvas
+let artX = 0, artY = 0, artW = 0, artH = 0;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
   background(255);
-  //helvetica for all canvas text
   textFont('Helvetica');
 
   input = createFileInput(handleFile);
@@ -42,32 +35,30 @@ function setup() {
   drawSplash();
 }
 
-//builds the inline style string for a button
-function btnStyle(bg, fg) {
-  return `
-    background: ${bg} !important;
-    color: ${fg} !important;
-    border: 1px solid #000 !important;
-    border-radius: 0 !important;
-    padding: 8px 16px !important;
-    width: ${BTN_W}px !important;
-    font-family: Helvetica !important;
-    font-size: 14px !important;
-    cursor: pointer !important;
-    box-sizing: border-box !important;
-  `;
-}
-
-//applies button style with hover swap
+//styles a button with hover swap
+//uses setProperty so p5's positioning isn't wiped
 function styleButton(btn) {
-  const base = btnStyle('#000', '#fff');
-  const hover = btnStyle('#fff', '#000');
-  btn.elt.setAttribute('style', base);
-  btn.elt.addEventListener('mouseenter', () => btn.elt.setAttribute('style', hover));
-  btn.elt.addEventListener('mouseleave', () => btn.elt.setAttribute('style', base));
+  const base = {
+    'background': '#000', 'color': '#fff',
+    'border': '1px solid #000', 'border-radius': '0',
+    'padding': '8px 16px', 'width': BTN_W + 'px',
+    'font-family': 'Helvetica', 'font-size': '14px',
+    'cursor': 'pointer', 'box-sizing': 'border-box',
+  };
+  for (let [k, v] of Object.entries(base)) {
+    btn.elt.style.setProperty(k, v, 'important');
+  }
+  btn.elt.addEventListener('mouseenter', () => {
+    btn.elt.style.setProperty('background', '#fff', 'important');
+    btn.elt.style.setProperty('color', '#000', 'important');
+  });
+  btn.elt.addEventListener('mouseleave', () => {
+    btn.elt.style.setProperty('background', '#000', 'important');
+    btn.elt.style.setProperty('color', '#fff', 'important');
+  });
 }
 
-//splash screen: title, button in middle, just do it below
+//splash: title, button, instruction below
 function drawSplash() {
   background(255);
   fill(0);
@@ -97,13 +88,12 @@ function windowResized() {
 }
 
 function handleFile(file) {
-  if (file.type === 'image') {
-    img = loadImage(file.data, processImage);
-    uploadButton.hide();
-    if (newFileButton) newFileButton.hide();
-    if (saveButton) saveButton.hide();
-    buttonsShown = false;
-  }
+  if (file.type !== 'image') return;
+  img = loadImage(file.data, processImage);
+  uploadButton.hide();
+  if (newFileButton) newFileButton.hide();
+  if (saveButton) saveButton.hide();
+  buttonsShown = false;
 }
 
 //converts image into ascii character grid
@@ -111,17 +101,17 @@ function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
-  //art width = window width, capped at MAX_ART_W
+  //art width capped at MAX_ART_W, height follows aspect ratio
   let imgAspect = img.height / img.width;
   artW = floor(min(windowWidth, MAX_ART_W) / cellSize) * cellSize;
   artH = floor((artW * imgAspect) / cellSize) * cellSize;
 
-  //canvas grows tall enough to fit buttons + art + padding
+  //canvas grows to fit everything
   let canvasH = max(windowHeight, TOP_PAD + artH + BOTTOM_PAD);
   resizeCanvas(windowWidth, canvasH);
   background(255);
 
-  //horizontally centered, starts at fixed top offset (not vertically centered)
+  //horizontally centered, pinned to top
   artX = floor((width - artW) / 2);
   artY = TOP_PAD;
 
@@ -131,11 +121,11 @@ function processImage() {
 
   for (let y = 0; y < work.height; y++) {
     for (let x = 0; x < work.width; x++) {
-      let c = work.get(x, y);
+      let b = brightness(work.get(x, y));
       asciiChars.push({
         x: artX + x * cellSize,
         y: artY + y * cellSize,
-        char: getAsciiChar(brightness(c))
+        char: getAsciiChar(b)
       });
     }
   }
@@ -149,19 +139,14 @@ function draw() {
   if (!imageLoaded) return;
 
   //reveal 200 chars per frame
-  for (let i = 0; i < 200; i++) {
-    if (drawIndex < asciiChars.length) {
-      let ascii = asciiChars[drawIndex];
-      fill(0);
-      text(ascii.char, ascii.x, ascii.y);
-      drawIndex++;
-    }
+  for (let i = 0; i < 200 && drawIndex < asciiChars.length; i++) {
+    let a = asciiChars[drawIndex++];
+    fill(0);
+    text(a.char, a.x, a.y);
   }
 
   //show buttons the moment generation finishes
-  if (drawIndex >= asciiChars.length && !buttonsShown) {
-    showButtons();
-  }
+  if (drawIndex >= asciiChars.length && !buttonsShown) showButtons();
 }
 
 //save in top-left of art, upload-new in top-right
@@ -196,6 +181,5 @@ function resetToSplash() {
 //brightness (0-255) to ascii character
 function getAsciiChar(brightness) {
   let chars = "   .,:-=+$#";
-  let index = floor(map(brightness, 0, 255, chars.length - 1, 0));
-  return chars[index];
+  return chars[floor(map(brightness, 0, 255, chars.length - 1, 0))];
 }
