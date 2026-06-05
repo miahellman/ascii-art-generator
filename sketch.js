@@ -477,7 +477,8 @@ function drawSplashOverlay() {
   textFont(FONT_FAMILY);
   textAlign(CENTER, CENTER);
 
-  let title = hasGeneratedOnce ? 'mia\'s ascii art generator' : '';
+  //let title = hasGeneratedOnce ? 'mia\'s ascii art\ngenerator' : '';
+  let title = ' ';
   textSize(FONT_SIZE_TITLE);
   text(title, width / 2, height / 4 - 40);
 
