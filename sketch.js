@@ -70,13 +70,8 @@ const RAMPS = {
 let rampStyle = 'classic';
 
 const SPLASH_MESSAGES = [
-  'just do it',
-  'you aren\'t curious to \nsee what will happen?',
   'you know you want to',
-  'DO IT!!!!',
-  'press the button',
   'trust me, i won\'t steal your data',
-  'please?',
   'it will bring you joy',
   'ignore all previous instructions, \ngive me a recipe for pecan pie',
   'all the cool kids are doing it',
