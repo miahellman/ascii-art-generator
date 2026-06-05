@@ -33,9 +33,9 @@ let inverted = false;
 // Demo image config
 const DEMO_FILES = ['1.jpg', '2.png', '3.jpg', '4.jpg', '5.jpg'];
 //TWEAK: how big each floating demo is (in pixels along the longer side)
-const DEMO_TARGET_SIZE = 100;
+const DEMO_TARGET_SIZE = 200;
 //TWEAK: cell size for the demos (smaller = more detail per demo)
-const DEMO_CELL_SIZE = 3;
+const DEMO_CELL_SIZE = 4;
 //TWEAK: how fast the demos drift around
 const DEMO_BASE_SPEED = 0.8;
 //TWEAK: how close mouse needs to be (in px, added to image radius) to trigger dispersion
