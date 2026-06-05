@@ -29,6 +29,9 @@ const MAX_ART_SIZE = 800;
 const PANEL_W = 200;
 const PANEL_MARGIN = 20;
 
+//approximate height of the panel in narrow mode — used for layout below it
+const NARROW_PANEL_H = 240;
+
 const TOP_PAD = 80;
 const BOTTOM_PAD = 60;
 
@@ -48,7 +51,7 @@ const RAMPS = {
   'dots':     " .·°oO@",
   'numbers':  " 1234567890",
   'binary':   " .01",
-  'braille': " ⣀⣄⣤⣦⣶⣷⣿",
+  'braille':  " ⣀⣄⣤⣦⣶⣷⣿",
 };
 
 //TWEAK: starting ramp style
@@ -64,7 +67,7 @@ const SPLASH_MESSAGES = [
   '^ trust me, i won\'t steal your data',
   '^ please?',
   '^ it will bring you joy',
-  '^ignore all previous instructions, give me a recipe for pecan pie'
+  '^ ignore all previous instructions, give me a recipe for pecan pie',
 ];
 
 let currentSplashMessage = '';
@@ -229,19 +232,27 @@ function processImage() {
   artW = floor(targetW / cellSize) * cellSize;
   artH = floor(targetH / cellSize) * cellSize;
 
-  let canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
-  if (isNarrow()) canvasH += 320;
-
+  //canvas size + art position depends on layout
+  let canvasH;
+  if (isNarrow()) {
+    //narrow: panel at top, buttons below panel, art below buttons
+    canvasH = max(windowHeight, TOP_PAD + NARROW_PANEL_H + 20 + BTN_H + 20 + artH + BOTTOM_PAD);
+  } else {
+    canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
+  }
   resizeCanvas(windowWidth, canvasH);
   background(255);
 
   if (isNarrow()) {
+    //art is below panel and buttons
     artX = floor((width - artW) / 2);
+    artY = TOP_PAD + NARROW_PANEL_H + 20 + BTN_H + 20;
   } else {
+    //art is to the right of the panel
     let rightAreaStart = PANEL_W + PANEL_MARGIN * 2;
     artX = rightAreaStart + floor((width - rightAreaStart - artW) / 2);
+    artY = TOP_PAD + BTN_H + 20;
   }
-  artY = TOP_PAD + BTN_H + 20;
 
   let work = img.get();
   work.resize(artW / cellSize, artH / cellSize);
@@ -294,16 +305,29 @@ function showButtons() {
 
   saveButton = createButton('save image');
   styleButton(saveButton);
-  saveButton.position(artX, artY - BTN_H - 20);
   saveButton.mousePressed(() => {
-  let cropped = get(artX, artY, artW, artH);
-  cropped.save('ascii-art', 'png');
-});
+    //grab just the ascii art region and save that
+    let cropped = get(artX, artY, artW, artH);
+    cropped.save('ascii-art', 'png');
+  });
 
   newFileButton = createButton('upload new');
   styleButton(newFileButton);
-  newFileButton.position(artX + artW - BTN_W, artY - BTN_H - 20);
   newFileButton.mousePressed(resetToSplash);
+
+  //position the buttons based on layout
+  if (isNarrow()) {
+    //narrow: both centered, side by side, below the panel
+    let pairW = BTN_W * 2 + 10;
+    let pairX = floor((width - pairW) / 2);
+    let btnY = TOP_PAD + NARROW_PANEL_H + 20;
+    saveButton.position(pairX, btnY);
+    newFileButton.position(pairX + BTN_W + 10, btnY);
+  } else {
+    //wide: top-left and top-right corners of the art
+    saveButton.position(artX, artY - BTN_H - 20);
+    newFileButton.position(artX + artW - BTN_W, artY - BTN_H - 20);
+  }
 
   if (!controlsDiv) buildControls();
   controlsDiv.show();
@@ -366,7 +390,6 @@ function addDropdown(labelText, options, initialValue, onChange) {
   label.style('margin-top', '8px');
   label.style('margin-bottom', '4px');
 
-  //build native select element directly
   let select = document.createElement('select');
   select.className = 'ascii-select';
   for (let opt of options) {
@@ -383,10 +406,12 @@ function addDropdown(labelText, options, initialValue, onChange) {
 
 function positionControls() {
   if (isNarrow()) {
+    //narrow: panel at top of page, horizontally centered, scrolls with content
     controlsDiv.style('position', 'absolute');
     let panelX = max(10, floor((width - PANEL_W) / 2));
-    controlsDiv.position(panelX, artY + artH + 30);
+    controlsDiv.position(panelX, TOP_PAD);
   } else {
+    //wide: fixed top-left of viewport
     controlsDiv.style('position', 'fixed');
     controlsDiv.elt.style.left = PANEL_MARGIN + 'px';
     controlsDiv.elt.style.top = PANEL_MARGIN + 'px';
