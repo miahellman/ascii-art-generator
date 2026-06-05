@@ -18,7 +18,6 @@ let hasGeneratedOnce = false;
 let controlsDiv;
 let cellSizeSlider;
 let contrastSlider;
-let rampSlider;
 let regenTimer = null;
 
 const BTN_W = 140;
@@ -27,7 +26,6 @@ const BTN_H = 36;
 //TWEAK: max width AND height the art can be
 const MAX_ART_SIZE = 550;
 
-//panel sizing
 const PANEL_W = 200;
 const PANEL_MARGIN = 20;
 
@@ -36,17 +34,49 @@ const BOTTOM_PAD = 60;
 
 const REVEAL_SPEED = 500;
 
+//TWEAK: starting contrast
 let contrast = 1.4;
-let rampDetail = 1;
 
-const RAMP_SHORT = " .:-=+*#%@";
-const RAMP_LONG = " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$";
+//TWEAK: ramp styles — feel free to add your own, key shows in the dropdown
+//ramps go from lightest (left, sparse) to darkest (right, dense)
+const RAMPS = {
+  'classic':  " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
+  'minimal':  " .:-=+*#%@",
+  'letters':  " .lcvonxserwmkhpdbqgKZSXAVUOQNHMW@",
+  'symbols':  ' .,:;!?"\'`-_=+~*<>()[]{}|/\\&#%@$',
+  'blocks':   " ░▒▓█",
+  'dots':     " ··••●⬤",
+  'numbers':  " 1234567890",
+  'binary':   " .01",
+};
+
+//TWEAK: starting ramp style — must match a key in RAMPS
+let rampStyle = 'classic';
+
+//TWEAK: splash subtitle messages — one is randomly picked on each visit to splash
+const SPLASH_MESSAGES = [
+  '^ just do it',
+  '^ you aren\'t curious to see what will happen?',
+  '^ i know you want to',
+  '^ DO IT!!!!',
+  '^ press the button',
+  '^ trust me, i won\'t steal your data',
+  '^ please?',
+  '^ it will bring you joy',
+];
+
+//holds the message chosen for the current splash view
+let currentSplashMessage = '';
 
 let artX = 0, artY = 0, artW = 0, artH = 0;
 
-//detects narrow screens — panel stacks above art instead of sitting beside it
 function isNarrow() {
   return windowWidth < PANEL_W + PANEL_MARGIN * 2 + MAX_ART_SIZE + 40;
+}
+
+//picks a random splash message
+function pickSplashMessage() {
+  currentSplashMessage = SPLASH_MESSAGES[floor(random(SPLASH_MESSAGES.length))];
 }
 
 function setup() {
@@ -54,7 +84,7 @@ function setup() {
   background(255);
   textFont('Helvetica');
 
-  //inject slider styles directly to head
+  //inject slider + dropdown styles
   let styleTag = document.createElement('style');
   styleTag.textContent = `
     input[type=range].ascii-slider {
@@ -85,6 +115,23 @@ function setup() {
       border-radius: 0;
       cursor: pointer;
     }
+    select.ascii-select {
+      width: 100%;
+      background: #fff;
+      color: #000;
+      border: 2px solid #fff;
+      border-radius: 0;
+      padding: 6px 8px;
+      font-family: Helvetica, Arial, sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+      box-sizing: border-box;
+    }
+    select.ascii-select:hover {
+      background: #000;
+      color: #fff;
+    }
   `;
   document.head.appendChild(styleTag);
 
@@ -95,6 +142,8 @@ function setup() {
   styleButton(uploadButton);
   uploadButton.mousePressed(() => input.elt.click());
 
+  //pick the initial splash message
+  pickSplashMessage();
   drawSplash();
 }
 
@@ -135,8 +184,9 @@ function drawSplash() {
   uploadButton.show();
   uploadButton.position(width / 2 - BTN_W / 2, height / 2);
 
+  //random subtitle message
   textSize(12);
-  text('^ just do it', width / 2, height / 2 + BTN_H + 25);
+  text(currentSplashMessage, width / 2, height / 2 + BTN_H + 25);
 }
 
 function windowResized() {
@@ -179,16 +229,12 @@ function processImage() {
   artW = floor(targetW / cellSize) * cellSize;
   artH = floor(targetH / cellSize) * cellSize;
 
-  //canvas size: tall enough for buttons + art + padding
   let canvasH = max(windowHeight, TOP_PAD + BTN_H + 20 + artH + BOTTOM_PAD);
-  //on narrow layouts, reserve space below for the panel
-  if (isNarrow()) canvasH += 240;
+  if (isNarrow()) canvasH += 280;
 
   resizeCanvas(windowWidth, canvasH);
   background(255);
 
-  //position art: on wide screens, centered in the area to the right of the panel
-  //on narrow screens, centered in the full window
   if (isNarrow()) {
     artX = floor((width - artW) / 2);
   } else {
@@ -246,7 +292,7 @@ function draw() {
 function showButtons() {
   buttonsShown = true;
 
-  saveButton = createButton('save image');
+  saveButton = createButton('save png');
   styleButton(saveButton);
   saveButton.position(artX, artY - BTN_H - 20);
   saveButton.mousePressed(() => saveCanvas('ascii-art', 'png'));
@@ -263,7 +309,6 @@ function showButtons() {
 
 function buildControls() {
   controlsDiv = createDiv();
-  //fixed position so it stays put on scroll, like the reference site
   controlsDiv.style('position', 'fixed');
   controlsDiv.style('background', '#000');
   controlsDiv.style('color', '#fff');
@@ -283,8 +328,9 @@ function buildControls() {
     contrast = v;
     scheduleRegen();
   });
-  rampSlider = addSlider('detail', 0, 1, rampDetail, 1, v => {
-    rampDetail = v;
+  //style picker — pulls options from the RAMPS object keys
+  addDropdown('style', Object.keys(RAMPS), rampStyle, v => {
+    rampStyle = v;
     scheduleRegen();
   });
 }
@@ -302,17 +348,28 @@ function addSlider(labelText, min, max, val, step, onChange) {
   return slider;
 }
 
-//positions the fixed panel
-//wide: top-left of viewport
-//narrow: switches to absolute and goes below the art
+//creates a labeled dropdown inside the controls panel
+function addDropdown(labelText, options, initialValue, onChange) {
+  let label = createDiv(labelText);
+  label.parent(controlsDiv);
+  label.style('margin-top', '8px');
+  label.style('margin-bottom', '4px');
+
+  let sel = createSelect();
+  sel.parent(controlsDiv);
+  sel.addClass('ascii-select');
+  for (let opt of options) sel.option(opt);
+  sel.selected(initialValue);
+  sel.changed(() => onChange(sel.value()));
+  return sel;
+}
+
 function positionControls() {
   if (isNarrow()) {
-    //switch to absolute so it scrolls with content, positioned below art
     controlsDiv.style('position', 'absolute');
     let panelX = max(10, floor((width - PANEL_W) / 2));
     controlsDiv.position(panelX, artY + artH + 30);
   } else {
-    //fixed to top-left of viewport, always visible
     controlsDiv.style('position', 'fixed');
     controlsDiv.elt.style.left = PANEL_MARGIN + 'px';
     controlsDiv.elt.style.top = PANEL_MARGIN + 'px';
@@ -340,11 +397,14 @@ function resetToSplash() {
   if (controlsDiv) controlsDiv.hide();
   input.elt.value = '';
 
+  //roll a new random message for the splash
+  pickSplashMessage();
+
   resizeCanvas(windowWidth, windowHeight);
   drawSplash();
 }
 
 function getAsciiChar(brightness) {
-  let chars = rampDetail === 1 ? RAMP_LONG : RAMP_SHORT;
+  let chars = RAMPS[rampStyle];
   return chars[floor(map(brightness, 0, 255, 0, chars.length - 1))];
 }
