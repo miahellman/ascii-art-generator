@@ -62,11 +62,21 @@ const COLOR_BG = '#fff';
 const COLOR_FG = '#000';
 const COLOR_TEXT_LIGHT = '#fff';
 const COLOR_TEXT_DARK = '#000';
+//TWEAK: error message color
+const COLOR_ERROR = '#cc0000';
 const FONT_FAMILY = 'JetBrains Mono';
 const FONT_SIZE_TITLE = 24;
 const FONT_SIZE_SPLASH = 12;
 const FONT_SIZE_CONTROLS = 12;
 const FONT_SIZE_LABEL = 14;
+
+//TWEAK: error messages
+const ERROR_MESSAGE = 'incorrect file type.\nuse: jpg, png, or webp';
+const ERROR_MESSAGE_HEIC = 'heic files won\'t work :(\nconvert to jpg or png first';
+const ERROR_MESSAGE_GIF = 'this is an image generator —\ngifs aren\'t supported. try a still image.';
+
+//file extensions we accept (jpg and jpeg are the same format, both included for filename matching)
+const ACCEPTED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
 const RAMPS = {
   'classic':  " .'`^\",:;Il!i><~+_-?][}{1)(|/\\tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$",
@@ -108,6 +118,9 @@ let regenTimer = null;
 let resizeTimer = null;
 
 let currentSplashMessage = '';
+//error state — when set, splash shows this in red instead of the random message
+let splashErrorMessage = null;
+
 let artX = 0, artY = 0, artW = 0, artH = 0;
 
 let demoRawImages = [];
@@ -347,6 +360,8 @@ function setup() {
   input = createFileInput(handleFile);
   input.hide();
   input.elt.setAttribute('aria-label', 'Upload image file');
+  //restrict the file picker to supported formats (still images only — no gif, no heic)
+  input.elt.setAttribute('accept', 'image/jpeg, image/png, image/webp');
 
   uploadButton = createButton('get creative');
   uploadButton.elt.setAttribute('aria-label', 'Click to upload an image file');
@@ -473,17 +488,23 @@ function drawSplash() {
 }
 
 function drawSplashOverlay() {
-  fill(COLOR_FG);
   textFont(FONT_FAMILY);
   textAlign(CENTER, CENTER);
 
-  //let title = hasGeneratedOnce ? 'mia\'s ascii art\ngenerator' : '';
   let title = ' ';
   textSize(FONT_SIZE_TITLE);
+  fill(COLOR_FG);
   text(title, width / 2, height / 4 - 40);
 
+  //show error in red if set, otherwise show the random splash message
   textSize(FONT_SIZE_SPLASH);
-  text(currentSplashMessage, width / 2, height / 4 + BTN_H + 25);
+  if (splashErrorMessage) {
+    fill(COLOR_ERROR);
+    text(splashErrorMessage, width / 2, height / 4 + BTN_H + 25);
+  } else {
+    fill(COLOR_FG);
+    text(currentSplashMessage, width / 2, height / 4 + BTN_H + 25);
+  }
 }
 
 // ===== FILE HANDLING =====
@@ -499,7 +520,7 @@ function windowResized() {
     }, RESIZE_DEBOUNCE);
   } else {
     resizeCanvas(windowWidth, windowHeight);
-    //regenerate demos if we crossed the mobile/desktop boundary
+    //regenerate demos if we crossed a viewport boundary
     let firstDemoSize = demoImages.length > 0 ? max(demoImages[0].w, demoImages[0].h) : 0;
     let targetSize = getDemoTargetSize();
     if (abs(firstDemoSize - targetSize) > 50) {
@@ -512,26 +533,60 @@ function windowResized() {
 function handleFile(file) {
   if (!file) return;
 
+  //clear any previous error
+  splashErrorMessage = null;
+
+  //reject non-image categories (video, audio, application, etc)
   if (file.type !== 'image') {
-    console.warn('Please upload an image file (JPG, PNG, GIF, etc.)');
+    splashErrorMessage = ERROR_MESSAGE;
     return;
   }
 
+  //inspect filename to catch types we can't handle even though browser calls them images
+  let filename = (file.name || '').toLowerCase();
+
+  //gifs are animated — this is a still image generator
+  if (filename.endsWith('.gif')) {
+    splashErrorMessage = ERROR_MESSAGE_GIF;
+    return;
+  }
+
+  //heic doesn't work on canvas operations across browsers
+  if (filename.endsWith('.heic') || filename.endsWith('.heif')) {
+    splashErrorMessage = ERROR_MESSAGE_HEIC;
+    return;
+  }
+
+  //also check the file extension matches our accepted list
+  //(catches tiff, bmp, svg, etc that browsers may or may not decode reliably)
+  let hasValidExtension = ACCEPTED_EXTENSIONS.some(ext => filename.endsWith(ext));
+  if (filename && !hasValidExtension) {
+    splashErrorMessage = ERROR_MESSAGE;
+    return;
+  }
+
+  //try to load — if browser can't decode for some reason, error callback handles it
+  //NOTE: ui cleanup (hiding button etc) happens in processImage on success, NOT here
   img = loadImage(
     file.data,
     processImage,
-    (err) => console.error('Failed to load image:', err)
+    (err) => {
+      console.error('Failed to load image:', err);
+      splashErrorMessage = ERROR_MESSAGE;
+    }
   );
+}
 
+// ===== IMAGE PROCESSING =====
+function processImage() {
+  //clear error and hide splash UI now that we know the image loaded successfully
+  splashErrorMessage = null;
   uploadButton.hide();
   if (newFileButton) newFileButton.hide();
   if (saveButton) saveButton.hide();
   if (controlsDiv) controlsDiv.hide();
   buttonsShown = false;
-}
 
-// ===== IMAGE PROCESSING =====
-function processImage() {
   asciiChars = [];
   drawIndex = 0;
 
@@ -779,6 +834,7 @@ function resetToSplash() {
   asciiChars = [];
   drawIndex = 0;
   buttonsShown = false;
+  splashErrorMessage = null;
 
   if (saveButton) saveButton.hide();
   if (newFileButton) newFileButton.hide();
