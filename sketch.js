@@ -618,7 +618,7 @@ function buildPanels() {
   styleCtl.classList.toggle('disabled', !settings.asciiEnabled);
 
   // --- preprocess panel ---
-  body = addPanel('preprocess');
+  body = addPanel('preprocess', true);
   addSlider(body, 'brightness', -0.5, 0.5, 0.05, settings.brightness,
     v => (v > 0 ? '+' : '') + v.toFixed(2), v => {
       settings.brightness = v;
@@ -642,7 +642,7 @@ function buildPanels() {
   });
 
   // --- dither panel ---
-  body = addPanel('dither');
+  body = addPanel('dither', true);
   let pixelCtl, thresholdCtl, modeCtl, levelsCtl, paletteCtl, colorsCtl;
   syncDitherFn = () => {
     const on = settings.ditherEnabled;
@@ -674,7 +674,7 @@ function buildPanels() {
   });
 
   // --- palette panel (colors the dither maps onto) ---
-  body = addPanel('palette');
+  body = addPanel('palette', true);
   paletteCtl = addSelect(body, 'palette', Object.keys(PALETTES), settings.palette, v => {
     settings.palette = v;
     rebuildColorRows();
@@ -753,13 +753,14 @@ function rebuildColorRows() {
   }
 }
 
-function addPanel(title) {
+function addPanel(title, startCollapsed) {
   const panel = el('div', 'panel', dock);
   const header = el('div', 'panel-header', panel);
   el('span', 'panel-title', header, title);
 
-  const collapse = el('button', 'panel-collapse', header, '[–]');
+  const collapse = el('button', 'panel-collapse', header, startCollapsed ? '[+]' : '[–]');
   collapse.setAttribute('aria-label', 'Collapse ' + title + ' panel');
+  if (startCollapsed) panel.classList.add('collapsed');
   collapse.addEventListener('click', (e) => {
     e.stopPropagation();
     const collapsed = panel.classList.toggle('collapsed');
