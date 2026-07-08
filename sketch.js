@@ -76,7 +76,7 @@ const DEMO_FILES = ['images/1.jpg', 'images/2.png', 'images/3.jpg', 'images/4.jp
 //TWEAK: total number of demos floating around — cycles through DEMO_FILES if higher than file count
 const DEMO_COUNT = 8;
 //TWEAK: cell size for the demos
-const DEMO_CELL_SIZE = 7;
+const DEMO_CELL_SIZE = 6;
 //TWEAK: how fast the demos drift
 const DEMO_BASE_SPEED = 0.8;
 //TWEAK: extra pixels beyond image edge that still triggers hover
